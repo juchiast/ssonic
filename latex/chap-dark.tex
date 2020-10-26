@@ -1,0 +1,412 @@
+\chapter{DARK Polynomial Commitment}
+\label{chap-dark}
+
+In this chapter we study DARK Polynomial Commitment scheme introduced by B\"unz et al \cite{bunz2020transparent}. The key contribution of this scheme is that it can be instantiated by a \textit{transparent} Group of Unknown Order, thus making the SNARKs transparent.
+
+We discuss two main constructions: homomorphic commitment and polynomial evaluation protocol with zero-knowledge and witness-extended emulation. The commitment relies on assumptions believed to be hard in generic Group of Unknown Order, namely the Adaptive Root Assumption and the Strong RSA Assumption.
+
+The construction in B\"unz et al. \cite{bunz2020transparent} can be decomposed to:
+\begin{enumerate}
+    \item An abstract protocol for $\REval$, assuming the existence of a homomorphic commitment for polynomials.
+    \item A Homomorphic Integer Commitment in generic Group of Unknown Order.
+    \item A scheme to encode polynomials as integers.
+    \item $\mathrm{EvalBounded}$: evaluation protocol for $\REval$.
+    \item Adding hiding commitments and zero-knowledge evaluation.
+    \item Optimizations to reduce proof's size, and to evaluate $m$ polynomials at $k$ points with small overhead.
+\end{enumerate}
+
+\section{Homomorphic Polynomial Commitment}
+
+\subsection{Homomorphic Integer Commitment}
+\label{section-integer-commitment}
+
+We start with a simple integer commitment, given a group of unknown order $\G$ and an element $g \in \G$, to commit an integer $x$, the committer compute $\gG^x$.
+
+\textbf{Homomorphic Integer Commitment:} Let $\G \gets \mathrm{GGen}(\lambda)$ and $g \rand \G$. We argue that $\gG^x$ is a binding commitment of $x$ if the Strong RSA Assumption holds for $\mathrm{GGen}$. \\
+Suppose an adversary $\mathcal{A}$ can break the binding property of the commitment, then $\mathcal{A}$ can find different $x_0$, $x_1$ such that $\gG^{x_0} = \gG^{x_1}$, therefore $\gG^{x_0 - x_1} = 1$. We proceed to construct an adversary for the Strong RSA Assumption, $\mathcal{A}_{RSA}$ picks an odd prime $l$ that is coprime with $x_0 - x_1$, then compute $e \gets l^{-1} \bmod (x_0 - x_1)$, we have $(\gG^e)^l = \gG^{1 + k(x_0 - x_1)} = g$, which mean $\gG^e$ is the $l$-th root of $g$ \cite{bunz2020transparent}. \\
+$\gG^x$ is also homomorphic, we have $\gG^{x+y} = \gG^x \gG^y$ and $\gG^{\alpha x} = (\gG^x)^\alpha$.
+
+\subsection{Polynomial Encoding}
+\label{section-polynomial-encoding}
+
+DARK made use of the homomorphic integer commitment $\gG^x$ by introducing an polynomial encoding which maps an integer polynomial $f(X) \in \Z[X]$ to an integer.  We summarize their construction below.
+
+\begin{definition}[Polynomial with Bounded Coefficients]
+\label{bounded-integer}
+Let $\Z(b) = \{x \in \Z : |x| \le b\}$, let $\Z(b)[X] = \{ f(X) = \sum f_i X^i \in \Z[X] : \mathrm{max}\{f_i\} \le b \}$ be the set of integer polynomials with coefficients in $[-b, b]$.
+\end{definition}
+
+\textbf{Integer Encoding of Polynomial.} Let $q$ be an odd integer, we define encoding and decoding for polynomials in $\Z(b)[X]$ where $q/2 > b$. Encoding $\aEnc: \Z(b)[X] \to \Z$ and decoding $\aDec: \Z \to \Z[X]$ are defined in algorithm \ref{algo:encode} and \ref{algo:encode}:
+
+\begin{ealgorithm}[Encode polynomial]
+\label{algo:encode}
+\quad
+
+\textup{
+$\aEnc(f(X) \in \Z(q/2)[X]):$
+\begin{itemize}
+    \item Return $f(q)$.
+\end{itemize}
+}
+\end{ealgorithm}
+
+\begin{ealgorithm}[Decode polynomial]
+\label{algo:decode}
+\quad
+
+\textup{\textbf{Output:} $f(X) = \sum_{i=0}^{d} f_i X^i$ where $f_i \in [-q/2, q/2]$ for all $i \in [d]$.\\
+$\aDec(y \in \Z)$:
+\begin{itemize}
+    \item We have $|f(q)| = |y| < q^{d+1} \implies \log_q |y| < d + 1$ therefore $d \gets \lfloor log_q |y| \rfloor$.
+    \item Then we recover the partial-sum array $S_k = \sum_{i=0}^k f_i q^i$ for $k \in [d]$, observe that
+    \begin{itemize}
+        \item $S_k \equiv y \pmod {q^{k+1}}$
+        \item $|f_i| < q/2 \implies |S_k| < q^{k+1} / 2$
+    \end{itemize}
+    Therefore,
+    $$
+    S_k = \begin{cases}
+        y \bmod q^{k+1} & \quad \text{if } y \bmod q^{k+1} < q^{k+1} / 2\\
+        y \bmod q^{k+1} - q^{k+1} & \quad \text{otherwise}
+    \end{cases}
+    $$
+    \item We have $f_0 = S_0, \forall i > 0, f_i = (S_i - S_{i-1}) / q^i$
+\end{itemize}
+}
+\end{ealgorithm}
+
+\begin{claim}
+Let $q$ be an odd positive integer, $\forall f(X) \in \Z(\frac{q-1}{2})[X], \aDec(\aEnc(f(X))) = f(X)$.
+\end{claim}
+
+\begin{claim}
+Let $q$ be an odd positive integer, for every $z \in \left(-\frac{q^{d+1}}{2}, \frac{q^{d+1}}{2}\right)$, there is a unique polynomial $f(X) \in \Z(\frac{q-1}{2})[X]$ with degree (at most) $d$ such that $f(q) = z$ \cite{bunz2020transparent}. 
+\end{claim}
+
+\textbf{Homomorphic properties of $\aEnc$.} $\aEnc$ is homomorphic, we have:
+\begin{itemize}
+    \item Addition: $f(q) + g(q) = (f + g)(q)$
+    \item Scalar multiplication: $\alpha f(q) = (\alpha \cdot f)(q)$ where $\alpha \in \Z$.
+\end{itemize}
+However, we also need the polynomial to be \textit{uniquely} decode-able, therefore $q$ must be large enough so that the coefficients do not overflow.
+
+\textbf{Encoding for polynomials in $\Z_p[X]$.} A polynomial in $\Z_p[X]$ is encoded by first mapping it into $\Z(\frac{p-1}{2})[X]$, each coefficient $f_i$ is replaced by $f_i \bmod p$ if $f_i \bmod p < p/2$ and replaced by $f_i - p$ otherwise.
+
+\subsection{Binding Commitment for Polynomials}
+
+Combining section \ref{section-integer-commitment} and \ref{section-polynomial-encoding}, we arrive at a Binding Commitment for polynomials in $\Z(q/2)[X]$ and $\Z_p[X]$.
+
+\begin{definition}[Binding commitment for integer polynomials]
+\label{dark-commitz}
+Let $q$ be an odd positive integer and $p$ is a prime number.
+The tuple $\Gamma = (\aSetup, \aCommitZ, \aOpenZ$ is a commitment scheme for polynomials in $\Z(q/2)[X]$.
+\begin{itemize}
+    \item $\aSetup(1^\lambda) \to \pp$: Sample a group $\G \rand GGen(1^\lambda)$ and a random element $\gG \rand \G$, and return $\pp \gets (\G, \gG, p, q)$.
+    \item $\aCommitZ(\pp; f(X) \in \Z(q/2)[X]) \to \gC$: Return $\gC \gets \gG^{f(q)}$.
+    \item $\aOpenZ(\pp, f(X), \gC)$: Check that $f(X) \in \Z(q/2)[X]$ and $\gC = \gG^{f(q)}$.
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Binding commitment for polynomials in $\Z_p$]
+\label{dark-commitz}
+Let $q$ be an odd positive integer and $p$ is a prime number.
+The tuple $\Gamma = (\aSetup, \aCommit, \aOpen)$ is a commitment scheme for polynomials in $\Z_p[X]$.
+\begin{itemize}
+    \item $\aSetup(1^\lambda) \to \pp$: Sample a group $\G \rand GGen(1^\lambda)$ and a random element $\gG \rand \G$, and return $\pp \gets (\G, \gG, p, q)$.
+    \item $\aCommit(\pp; f(X) \in \Z_p[X]) \to (\gC; \hat{f}(X))$: Map $f(X)$ to $\hat{f}(X) \in \Z(\frac{p-1}{2})[X]$, return $\gC \gets \gG^{\hat{f}(q)}$ and $\hat{f}(X)$.
+    \item $\aOpen(\pp, f(X), (\gC, \hat{f}(X)))$: Check that $\hat{f}(X) \in \Z(q/2)[X]$ and $\gC = \gG^{\hat{f}(q)}$ and $f_i \equiv \hat{f}_i \pmod p$.
+\end{itemize}
+\end{definition}
+
+\begin{theorem}
+\label{claim-binding}
+$\Gamma = (\aSetup, \aCommitZ, \aOpenZ)$ is \textup{binding} if the Adaptive Root Assumption and the Strong RSA Assumption hold for $GGen$. \cite{bunz2020transparent}.
+\end{theorem}
+
+\textbf{Proof of theorem \ref{claim-binding}.} Suppose an adversary $\mathcal{A}$ breaks the binding property of $\Gamma$, which means $\mathcal{A}$ can produce $f_0(X) \ne f_1(X)$ such that $\gG^{f_0(q)} = \gG^{f_1(q)} = \mathrm{C}$, then:
+\begin{itemize}
+    \item $\gG^{f_0(q) - f_1(q)} = 1$ which breaks the Low Order assumption and therefore breaks the Adaptive Root assumption.
+    \item We construct adversary $\mA_{RSA}$ for the Strong RSA assumption. $\mathcal{A}_{RSA}$ pick an odd prime $l$ that is coprime to $f_0(q)-f_1(q)$, then compute $e \gets l^{-1} \bmod (f_0(q)-f_1(q))$, we have $(\gG^e)^l = \gG^{1 + k(f_0(q)-f_1(q))} = g$, therefore $\gG^e$ is the $l$-th root of $g$ and $\mathcal{A}_{RSA}$ break the Strong RSA assumption.
+\end{itemize}
+
+\subsection{Hiding Commitment for Polynomials}
+
+\textit{Hiding} property is added to $\aCommitZ$ by adding a large blinding coefficients. Let $d \gets \deg(f(X))$, then the commitment is $\gG^{f(q) + r q^{d+1}}$ for a large $r$.
+
+\begin{definition}[Hiding Polynomial Commitment]
+Let $B \ge |\G|$ be a publicly known bound of the order of $\G$.
+\begin{itemize}
+    \item $\aSetup(1^\lambda) \to \mathrm{pp}$: Sample a group $\G \rand GGen(1^\lambda)$ and a random element $\gG \rand \G$, let $B > |\G|$ be a publicly known bound of the order of $\G$, return $\mathrm{pp} \gets (\G, \gG, p, q, B)$.
+    \item $\aHidingCommit(\mathrm{pp}; f(X) \in \Z(q/2)[X]) \to (\gC; r, d)$: Let $d \gets \mathrm{deg}(f(X))$ and $r \rand [0, B \cdot 2^\lambda)$, return commitment $\gC \gets \gG^{f(q) + r \cdot q^{d+1}}$ with opening hint $r$ and $d$.
+    \item $\aHidingOpen(\mathrm{pp}, f(X), \mathrm{C}, r, d)$: Check that $f(X) \in \Z(q/2)[X]$ and $\gC = \gG^{f(q) + r \cdot q^{d+1}}$ and $\mathrm{deg}(f(X)) \le d$.
+\end{itemize}
+\end{definition}
+
+\textbf{Remark:} Hiding commitment for polynomial in $\Z_p[X]$ is defined similarly.
+
+\begin{theorem}
+The tuple $\Gamma = (\aSetup, \aHidingCommit, \aHidingOpen)$ is \textup{hiding} if the \textup{Subgroup Indistinguishability assumption} holds for $\aSetup$ \cite{bunz2020transparent}.
+\end{theorem}
+
+\begin{definition}[Subgroup Indistinguishability assumption \cite{bunz2020transparent}]
+The \textup{Subgroup Indistinguishability assumption} hold for $\aSetup$ if no efficient adversary can distinguish between a random element of $\langle \mathsf{h} \rangle$ and $\langle \gG \rangle$ for any non-trivial $\mathsf{h} \in \langle \gG \rangle$.
+\end{definition}
+
+\subsection{Analysis and Optimizations}
+
+\textbf{Homomorphic properties.} We have three homomorphisms for the commitment scheme, denote $\C{f(X)}$ as the commitment of $f(X)$, $\C{\cdot}: \Z(q/2)[X] \to \G$, we have:
+\begin{itemize}
+    \item Addition: $\C{f(X) + h(X)} = \gG^{f(q) + h(q)} = \gG^{f(q)} \gG^{h(q)} = \C{f(X)}\C{h(X)}$.
+    \item Scalar multiplication: $\C{\alpha f(X)} = \gG^{\alpha f(q)} = (\gG^{f(q)})^{\alpha} = \C{f(X)}^{\alpha}$.
+    \item Monomial multiplication: $\C{X^k f(X)} = \gG^{f(q) \cdot q^k} = \C{f(X)}^{q^k}$
+\end{itemize}
+These homomorphisms hold as long as the original and resulted polynomials are in $\Z(q/2)[X]$.
+
+\textbf{Optimizations.} Computing $\gG^{f(q)}$ takes $O(d\log q)$ group multiplications, where $d$ is the degree of the polynomial. We could bring this down with pre-computation, observing that $\gG^{f(q)} = \prod_{i=0}^d (\gG^{q^i})^{f_i}$, we can pre-compute $\gG^{q^i}$ for all $i \in [d]$, the cost is now $O(d\log \mathrm{max}\{f_i\})$. We will see in the construction of evaluation protocol that $q$ is much larger than the coefficients of $f(X)$, $q \in O(p^{\log d})$, therefore this brings the cost down by a $\log d$ factor.
+
+Furthermore, we can compute $\prod_{i=0}^d (\gG^{q^i})^{f_i}$ in parallel, and multi-exponentiation techniques \cite{yen2012multi, borges2017parallel} can be employed.
+
+\section{Polynomials Evaluation Protocol}
+
+This section describes the \textit{zero-knowledge argument of knowledge} for the relation $\REval$ introduced by B\"unz et al. \cite{bunz2020transparent}. Informally, given $\gG \in \G, \mathrm{C} \in \G$ $y, z \in \Z_p$, $d \in \N$, the argument proves that the Prover knows $f(X) \in \Z((p-1)/2)[X]$ such that:
+\begin{itemize}
+    \item $\gC$ is the commitment of $f(X)$: $\gC = \gG^{f(q)}$
+    \item $\deg(f(X)) \le d$
+    \item $f(z) \equiv y \pmod p$
+\end{itemize}
+
+\subsection{Protocol Description}
+
+DARK does this by splitting the polynomial in half and taking a random linear combination to reduce the statement about $f(X)$ with degree $d$ to $f'(X)$ with degree $d/2$. When $d = 0$, $f(X)$ is a constant and $\mP$ sends it directly to $\mV$.
+
+Protocol \ref{dark-eval} is an interactive argument for $\REval$, which uses recursive protocol \ref{dark-evalbounded} as a sub-protocol.
+
+\begin{protocol}[Eval]
+\label{dark-eval} \quad
+
+\textup{
+$\aEval(\pp, \mathrm{C} \in \G, z \in \Z, y \in \Z, d \in \N; f(X) \in \Z_p[X]):$
+\begin{enumerate}
+    \item $\mP:$ lift $f(X)$ to $\hat{f}(X) \in \Z(\frac{p-1}{2})[X]$.
+    \item $\mP$ and $\mV$: let $\pp \gets (\pp, \varsigma)$, where $\varsigma \gets p^{\log_2(d+1)}$ if $\G$ is RSA group and $\varsigma \gets p^{2\log_2(d+1)}$ if $\G$ is class group.
+    \item $\mP$ and $\mV$ run $\aEvalBounded(\pp, \gC, z, y, d, (p-1)/2; \hat{f}[X])$.
+\end{enumerate}
+}
+\end{protocol}
+
+\begin{protocol}[EvalBounded]
+\label{dark-evalbounded} \quad
+
+\textup{
+$\aEval(\pp, \mathrm{C} \in \G, z \in \Z, y \in \Z, d \in \N, b \in \N; f(X) \in \Z(b)[X]):$
+\begin{itemize}
+    \item If $d = 0$:
+    \begin{itemize}
+        \item $\mP$: send $f$, where $f(X) = f$.
+        \item $\mV$: check that $|f| < b$ and $f \equiv y \pmod p$ and $\gG^{f} = \gC$ and $b \cdot \varsigma < q$. Output 1 if all checks pass, otherwise output 0. 
+    \end{itemize}
+    \item If $d$ is even:
+    \begin{itemize}
+        \item $\mP$: let $f'(X) \gets X f(X)$.
+        \item $\mV$: let $\gC' \gets \gC^q, y' \gets yz, d' \gets d + 1$.
+        \item $\mP$ and $\mV$ run $\aEvalBounded(\pp, \gC', z, y', d', b; f'(X))$.
+    \end{itemize}
+    \item If $d$ is odd:
+    \begin{itemize}
+        \item $\mP$ and $\mV$: let $d' \gets \lfloor d/2 \rfloor$.
+        \item $\mP$: compute $f_L(X) \gets \sum_{i=0}^{d'} f_i X^i$ and $f_H(X) \gets \sum_{i=0}^{d'} f_{d' + i + 1} X^i$, $\gC_L \gets \gG^{f_L(q)}$, $\gC_H \gets \gG^{f_H(q)}$, $y_L \gets f_L(z) \bmod p$, $y_H \gets f_H(z) \bmod p$. $\mP$ sends $\gC_L, \gC_H, y_L, y_H$.
+        \item $\mV$: check that $y \equiv y_L + z^{d'+1} y_H \pmod p$.
+        \item $\mP$ and $\mV$ run $\aPoE(\gC_H, \gC / \gC_L, q^{d'+1})$.
+        \item $\mV$: sample $\alpha \rand[-\frac{p-1}{2}, \frac{p-1}{2}]$ and send it to $\mP$.
+        \item $\mP$ and $\mV$: let $\gC' \gets \gC_L^\alpha \gC_H$, $y' \gets (\alpha y_L + y_R) \bmod p$, $b' \gets b 2^{\lambda + 1}$.
+        \item $\mP$ and $\mV$ run $\aEvalBounded(\pp, \gC', z, y', d', b; f'(X))$.
+    \end{itemize}
+\end{itemize}
+}
+\end{protocol}
+
+\begin{protocol}[Proof of Exponentiation]
+\label{aPoE}
+\quad
+
+\textup{
+$\aPoE(u \in \G, w \in \G, e \in \N)$:
+\begin{itemize}
+    \item $\mV$: sample random $O(\lambda)$-bit prime $l$ and send it to $\mP$.
+    \item $\mP$ and $\mV$: perform Euclidean division $e = k l + r$.
+    \item $\mP$: compute $x \gets u^k$ and send it to $\mV$.
+    \item $\mV$: check that $x^l u^r = w$.
+\end{itemize}
+}
+\end{protocol}
+
+\begin{theorem}[PoE soundness \cite{bunz2020transparent}]
+$\aPoE$ is an interactive argument for the relation $\RPoE = \{\langle (u, w, e), \varnothing \rangle : u, w \in \G, e \in N, u^e = w \}$ with negligible soundness error if the Adaptive Root Assumption holds for $GGen$.
+\end{theorem}
+
+\textbf{$\aEval$ soundness.} There are two theorems in \cite{bunz2020transparent} to show that $\aEval$ has Witness-Extended Emulation, one for RSA groups and one for class groups. Witness-Extended Emulation implies soundness, therefore we do not need a soundness proof for the protocol. Theorem \ref{wee-rsa} is for RSA groups, the theorem uses Strong RSA Assumption, this assumption does not hold for class groups. Therefore theorem \ref{wee-class} replaces it with 2-Strong RSA Assumption, this increases the bound on $q$.
+
+\begin{theorem}
+\label{wee-rsa}
+The tuple $\Gamma = (\aSetup, \aCommit, \aOpen, \aEval)$ has Witness-Extended Emulation for the relation $\REval$ if $q > p^{2\lceil \log_2(d+1) \rceil + 1}$ and the Adaptive Root Assumption and the Strong RSA Assumption hold for $GGen$, where $d$ is the maximum degree of polynomials that $\Gamma$ can process.
+\end{theorem}
+
+\begin{theorem}
+\label{wee-class}
+The tuple $\Gamma = (\aSetup, \aCommit, \aOpen, \aEval)$ has Witness-Extended Emulation for the relation $\REval$ if $q > p^{3\lceil \log_2(d+1) \rceil + 1}$ and the Adaptive Root Assumption and the 2-Strong RSA Assumption hold for $GGen$, where $d$ is the maximum degree of polynomials that $\Gamma$ can process.
+\end{theorem}
+
+\subsection{Optimizations}
+\label{sec-dark-optimization}
+
+\textbf{Use PoE to transfer the commitments.} Instead of sending $\gC_L$ and $\gC_H$ then using PoE to prove that $\gC / \gC_L = \gC_H^{q^{d'+1}}$, we can use PoE to transfer the commitments. The modification to $\aEval$ is as follow:
+\begin{itemize}
+    \item $\mP$: send $\gC_H$ to $\mV$.
+    \item $\mV$: sample random $O(\lambda)$-bit prime $l$ and send it to $\mP$.
+    \item $\mP$ and $\mV$: perform Euclidean division $q^{d'+1} = k l + r$.
+    \item $\mP$: send $x \gets \gC_H^k$ to $\mV$.
+    \item $\mV$: let $\gC_L \gets \gC / (x^l \gC_H^r)$.
+\end{itemize}
+This optimization reduce the proof size by one element per round, for RSA group of 120-bit security, one element is worth 3048 bits.
+
+Similarly, $\mV$ can infer $y_L$: $y_L \gets y - z^{d' + 1} y_H$.
+
+\textbf{Compute PoE in parallel.} PoE contains a large exponentiation $\gC_H^k$ where $k = \lfloor q^{d' + 1} / l \rfloor$ has $O(d' \log_2 q)$ bits. Observing that $C_H = \gG^{f_H(q)}$, we rewrite $k$ as a polynomial $h(X)$ such that $h(q) = k$, then we have $\gC_H^k = \gG^{f_H(q) \cdot h(q)} = \gG^{(f_H \cdot h)(q)}$, then pre-computation of $\gG^{q^i}$ can be used to compute the exponentiation in parallel.\\
+Let $h(X) = \sum_{i=0} h_i X^i$, we describe how to find $h(X)$ such that $h(q) = \lfloor q^d / l \rfloor$. Assuming that $0 < x < l$, we have:
+$$\frac{xq^d}{l} = \lfloor xq / l \rfloor q^{d-1} + \frac{(xq \bmod l)q^{d-1}}{l}$$
+Using the above formula, start with $x = 1$, we can extract the coefficients of $h(X)$, starting from the most-significant coefficient.
+
+\textbf{Evaluating at multiple points.} The protocol can be extended to evaluating at $k$ points, $\Vec{z}, \Vec{y} \in \F^k$. At the final step, the verifier checks that $f \equiv y_i \pmod p$ for all $i \in [k]$.
+
+\textbf{Combining statements.} It is also possible to combine two statements $f(z) = y_0$ and $g(z) = y_1$ into a single statement $h(z) = y_2$ by taking linear combination of $f(X)$ and $g(Z)$. In general, we can evaluate $m$ polynomials by combining it into a single polynomials \cite{bunz2020transparent}. To reserve the degree bound condition, each polynomial is shifted to the maximum degree in $k$ polynomials. We present the protocol for evaluating $m$ polynomials in protocol \ref{joined-eval}.
+\begin{protocol}[JoinedEval]
+\label{joined-eval}
+\quad
+
+\textup{$\aJoinedEval(\pp, z \in \Z, \{\gC_i, y_i \in \Z, d_i \in \N\}_{i=1}^{m}; \{\hat{f}_i(X) \in \Z_p[X]\}_{i=1}^{m}):$
+\begin{itemize}
+    \item Let $d \gets \max \{d_i\}$
+    \item For each $i \in [m]$;
+    \begin{itemize}
+        \item $\mP$: Lift $\hat{f}_i(X) \in \Z_p[X]$ to $f_i(X) \in \Z(\frac{p-1}{2})[X]$, let $f_i(X) \gets X^{d - d_i} f_i(X)$.
+        \item $\mV$: Let $y_i \gets z^{d - d_i} y_i$, $d_i = d$.
+        \item $\mP$: Compute $u \gets \gC^{q^{d - d_i}}$ and send $u$ to $\mV$.
+        \item $\mP$ and $\mV$ run $\aPoE(\gC_i, u, q^{d - d_i})$ to check the correctness of $u$, if the check pass then let $\gC_i \gets u$.
+    \end{itemize}
+    \item $\mV$: Sample $\Vec{c} \rand [-\frac{p-1}{2}, \frac{p-1}{2}]^{m-1}$
+    \item $\mP$: Let $f(X) = f_m(X) + \sum_{i=1}^{m-1} c_i f_i(X)$.
+    \item $\mV$: Let $y \gets y_m + \sum_{i=1}^{m-1} c_i y_i$, $\gC \gets C_m \prod_{i=1}^{m-1}C_i^{c_i}$, $b \gets m \frac{p-1}{2} \cdot 2^\lambda$.
+    \item $\mP$ and $\mV$ run $\aEvalBounded(\pp, \gC, z, y, d, b; f(X))$.
+\end{itemize}
+}
+\end{protocol}
+
+\subsection{Zero-knowledge Evaluation}
+
+To achieve zero-knowledge, \cite{bunz2020transparent} uses \textit{hiding commitment} in combination with a \textit{random blinding polynomial}.
+
+\begin{protocol}[ZKEval]
+\label{zk-eval}
+\quad
+
+\textup{
+$\aZKEval(\pp, \gC \in \G, z \in \Z, y \in \Z, d \in \N, b \in \Z; f(X) \in \Z(b)[X], r \in \Z)):$
+\begin{itemize}
+    \item $\mP$: sample a random degree $d$ polynomial $k(X) \rand \Z(b \cdot \frac{p-1}{2} \cdot 2^\lambda)[X]$, compute hiding commitment $(\gC_k, r_k) \gets \aHidingCommit(\pp; k(X))$, let $y_k \gets k(z) \bmod p$, send $\gC_k$ and $y_k$ to $\mV$.
+    \item $\mV$: sample random $c \rand [-\frac{p-1}{2}, \frac{p-1}{2}]$.
+    \item $\mP$: compute $s(X) \gets k(X) + c \cdot f(X)$ and $r_s \gets r_k + c \cdot r$, send $r_s$ to $\mV$.
+    \item $\mV$: compute $\gC_s \gets \gC_k \gC^c \cdot \gG^{-r_s \cdot q^{d+1}}$, $y_s \gets y_k + c \cdot y$, $b_s \gets b \cdot \frac{p-1}{2} \cdot (2^\lambda + 1)$.
+    \item $\mP$ and $\mV$ run $\aEvalBounded(\pp, \gC_s, z, y_s, d, b_s; s(X))$.
+\end{itemize}
+}
+\end{protocol}
+
+Basically, $\mP$ samples a random $k(X)$ and releases its hiding commitment $\gC_k$, $\mV$ sample a challenge $c$, $\mP$ mix $k(X)$ and $f(X)$ into $s(X)$ and release its blinding coefficient $r_s$, $\mV$ then derives a non-hiding commitment of $s(X)$ and use it in $\aEvalBounded$. Zero-knowledge comes from the fact that $s(X)$ is statistically close to a random polynomial, the challenge $c$ keeps it from being totally random, therefore ensure the soundness of the protocol.
+
+\textbf{Evaluate multiple polynomials in zero-knowledge.} We can combine the polynomials as in section \ref{sec-dark-optimization}, the new blinding coefficient is $r \gets r_m + \sum_{i=1}^{m-1} c_i r_i$.
+
+\begin{theorem}[Security of $\aZKEval $\cite{bunz2020transparent}]
+Protocol $\aZKEval$ has \textup{witness-extended emulation} and \textup{honest-verfier $\delta$-statistical zero-knowledge} for $q > p^{2 \log_2 d + 4}$ and $\delta < d \cdot 2^{-\lambda}$, assuming the Adaptive Root assumption and the strong RSA assumption holds.
+\end{theorem}
+
+\textbf{Proof sketch.} We show that $\aZKEval$ has honest-verifier statistical zero-knowledge.\\
+Let $\aView(\mP(x, w), \mV(x))$, be the distribution of the view of $\mV$ when interacting with $\mP$, on common input $x$ and public parameter $\pp$. We construct a PPT simulator $\mS$ such that $\mS(x)$ is statistically close to $\aView(\mP(x, w), \mV(x))$.\\
+$\aView(\dots)$ consists of $\gC_k, y_k, c, \gC_s, y_s$ and $\mV$'s view in $\aEvalBounded$. Given the instance $x = (\gC, z, y)$, $\mS$ follow the steps:
+\begin{enumerate}
+    \item Sample uniformly random $s(X) \rand \Z(b_s)[X]$ and random blinding coefficient $r_s \gets [0, B \cdot 2^\lambda \cdot \frac{p-1}{2}]$.
+    \item Sample random challenge $c \rand [-\frac{p-1}{2}, \frac{p-1}{2}]$.
+    \item Compute commitment of $s(X)$, $\gC_s \gets \gG^{s(q)}$.
+    \item Compute hiding commitment of $k(X)$, $\gC_k \gets \gC^{-c} \cdot \gG^{r_s \cdot q^{d+1}}$.
+    \item Compute $y_k \gets s(z) - c \cdot y$.
+    \item $\mS$ run $\aEvalBounded$ with $s(X)$ as the witness.
+\end{enumerate}
+$\mS$ returns a valid transcript and is statistically close to the distribution of the real transcript \cite{bunz2020transparent}.
+
+\section{Proving Witness-extended Emulation}
+
+Beside the Adaptive Root assumption and the Strong RSA assumption, DARK requires a bound on the parameters $p$ and $q$, e.g. $q > p^{2 \cdot \log_2 d + 2}$ for $\aEval$ and $q > p^{2 \cdot \log_2 d + 4}$ for $\aZKEval$ on RSA group. We will briefly show how to get these bounds, for the full proof, prefer to \cite{bunz2020transparent}.
+
+In \cite{bunz2020transparent}, witness-extended emulation was proven using the General Forking lemma, by constructing an extractor $\mX$ that, given a complete binary tree of \textit{accepting} transcripts, output a witness $f(X)$ for the interaction. 
+
+\textbf{Binary tree of transcripts.} At the root of the tree is the instance $(\gC, z, y)$, whenever the verifier sample the challenge $\alpha$, the node splits into two child nodes, each node represents a different value for $\alpha$. At the leaf of the tree is the constant $f$ that the prover sent. For a polynomial of degree $d$, the number of challenges is $n = \lceil \log_2 (d+1) \rceil$, we have a tree of $2^n \in O(d)$ possible transcripts.
+
+We will be analyzing each step of the recursive function $\aEvalBounded$. In round $i$, the instance is:
+\begin{itemize}
+    \item $\gC^{(i)} \in \G$: commitment of the witness that we need to extract.
+    \item $y^{(i)} \in \Z$.
+    \item $d^{(i)}$: degree of the witness.
+    \item $z \in \Z$: evaluation point, unchanging throughout the protocol.
+\end{itemize}
+
+Denote by $f^{(i)}(X)$ the witness that we need to extract at each round $i$, $f^{(i)}(X)$ has to satisfy:
+\begin{itemize}
+    \item $\gG^{f^{(i)}(q)} = \gC^{(i)}$
+    \item $f^{(i)}(z) = y^{(i)}$
+    \item $\deg(f^{(i)}(X)) \le d^{(i)}$
+\end{itemize}
+
+Starting from the leaf of the tree, where the prover sent a constant $f \in \Z$, we have that $f^{(n)}(X) = f$, where $n$ is the height of the tree. Because this is an \textit{accepting} transcript, $f^{(n)}(X)$ satisfies all of the conditions above.
+
+When $d^{(i)}$ is even, assuming we have the extracted witnesses of the next round $f^{(i+1)}(X)$. We have that $f^{(i+1)}(q)$ must be divisible by $q$, otherwise $\gC^{(i)}$ is the $q$-th root of $\gG^{f^{(i+1)}(q)}$ and we break the Fractional Root assumption.
+
+When $d^{(i)}$ is odd, the tree splits into two child nodes, each node with a different challenge $\alpha_1, \alpha_2 \in [-\frac{p-1}{2}, \frac{p-1}{2}]$. According to lemma \ref{lemma:combining}, we can extract the witness $f^{(i)}(X)$ from two child witnesses $f^{(i+1)}_1(X)$ and $f^{(i+1)}_2(X)$.
+
+\begin{lemma}[Combining for integer witnesses \cite{bunz2020transparent}]
+\label{lemma:combining}
+Let $(\G, \gG, q, p)$ be the parameters of DARK commitment scheme. Given $(z, \gC_L, \gC_H, y_L, y_H)$ and $(\alpha, f, y, \alpha', f', y')$ such that $\gG^f = \gC_L^\alpha \cdot \gC_H$ and $\gG^{f'} = \gC_L^{\alpha'} \cdot \gC_H$. Further, let $f$ and $f'$ decode to $f(X)$ and $f'(X)$ with coefficients bounded by $b$, i.e. $f(X) \gets \aDec(f), f'(X) \gets \aDec(f')$, and $f(X), f'(X) \in \Z(b)[X]$. Let $f(z) \equiv y \pmod p$ and $f'(z) \equiv y' \pmod p$. Then, there exists an PPT extractor $\mX$ that can compute either:
+\begin{enumerate}
+    \item $f_L(X), f_H(X) \in \Z(b \cdot (p-1))[X]$ such that
+    \begin{itemize}
+        \item $f_L(z) \equiv y_L \pmod p$ and $f_H(z) \equiv y_H \pmod p$.
+        \item $\gC_L = \gG^{f_L(q)}$ and $\gC_H = \gG^{f_H(q)}$.
+    \end{itemize}
+    \item A break of the Low Order assumption.
+    \item A break of the Fractional Root assumption.
+\end{enumerate}
+\end{lemma}
+
+\textbf{Infer the bound of $q$.} $q$ has to be large enough so that decoding works correctly during witnesses extraction, concretely, $q/2$ must be larger than all coefficients of extracted polynomials. In $\aEvalBounded$, whenever $\mV$ sample a challenge $\alpha \in [-\frac{p-1}{2}, \frac{p-1}{2}]$, the coefficients bound is increased by a factor of $p$, application of lemma \ref{lemma:combining} increased it by a factor of $p$, therefore we have $q > p \cdot p^{2 \lceil \log_2 (d+1) \rceil}$ in theorem \ref{wee-rsa}. 
+
+\section{Generating and Verifying Parameters}
+
+We describe how to sample $(p, q, \G, \gG)$ to be used in the the commitment scheme, we call this procedure $\aParamGen$.
+
+\textbf{Input.} Input of $\aParamGen$ are:
+\begin{itemize}
+    \item Security parameter $\lambda = 120$.
+    \item $m$: maximum number of polynomials to be combined using $\aJoinedEval$.
+    \item $d$: maximum degree of input polynomials.
+\end{itemize}
+
+\textbf{Output.} Output of $\aParamGen$ are:
+\begin{itemize}
+    \item $p, q, \G, \gG$.
+    \item $(\gG^q)^i$ for each $i \in [d]$.
+    \item Proof of correct exponentiation of each $(\gG^q)^i$.
+\end{itemize}
+
+$\aParamGen$ samples a 3048-bit RSA group $\gG$, a random element $\gG \in \G$. 3048-bit RSA groups are believed to have 120-bit security \cite{bunz2020transparent}.
+
+Then, $\aParamGen$ samples a $(\lambda + \log_2 d)$-bit prime number, and sample an odd number $q$ that has $|p| \cdot (2 \cdot \lceil \log_2 d \rceil + 4 + m)$ bits, where $|p|$ is the bit-size of $p$. This ensure $q > p^{2 \cdot \log_2 d + 4 + m}$, therefore we can evaluate $m$ polynomials in zero-knowledge using there parameters.
+
+Then, $\aParamGen$ compute each $(\gG^q)^i$ and use $\aPoE$ to produce a proof for this computation, this proof ensures the correctness of the values and is fast to verify.

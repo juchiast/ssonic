@@ -1,0 +1,296 @@
+\chapter{Implementation and Experimentation}
+\label{chap-implement}
+
+We implement non-succinct version of Supersonic over the RSA group, where the Verifier has to evaluate $S(X, Y)$ and $k(Y)$. $S(X, Y)$ has $O(n)$ non-zero coefficients and $k(Y)$ has $O(|x|)$ non-zero coefficients.
+
+We combine two interactive protocols \ref{sonic-iop} and \ref{zk-eval} to get an \textit{interactive} argument for $\RSonic$, then we use the Fiat-Shamir heuristic to produce a \textit{non-interactive} argument.
+
+This chapter contains several techniques used in the implementation, and performance analysis and experiment results.
+
+\section{Fiat-Shamir Heuristic}
+\label{sec-fiat-shamir}
+
+The Fiat-Shamir heuristic is used to transform an honest-verifier \textit{interactive} argument into a \textit{non-interactive} argument.
+
+\textbf{Random Oracle model.} In the Random Oracle model, parties involved have accesses to an Oracle $f(\cdot)$ that output a random value $y$ every time it is invoked with a value $x$. Query $x$ always returns the same random value $y$. In practice, $f(\cdot)$ is implemented by a secure hash function.
+
+The Fiat-Shamir heuristic replaces verifier's messages with $f(x)$, where $f(\cdot)$ is a Random Oracle and $x$ is previous prover's messages.
+
+Inspired by Marlin's implementation\footnote{\url{https://github.com/scipr-lab/marlin}}, we use ChaCha20 pseudorandom generator. ChaCha20 is seeded by a 256-bit seed, and we use BLAKE-3 hashes to get the seed from prover's messages.
+
+\textbf{Fiat-Shamir heuristic.} Let $\mathsf{seed} \in \{0, 1\}^{256}$ be the seed of ChaCha20,
+\begin{itemize}
+    \item In the beginning, $\mathsf{seed}$ can be initialized by hashing public inputs, or by choosing an arbitrary value.
+    \item Whenever the prover sends a message $\mathsf{msg}$, $\mathsf{seed} \gets \mathsf{hash}(\mathsf{seed} + \mathsf{msg})$, where $+$ is byte-concatenation of the values. 
+\end{itemize}
+
+\textbf{Security.} The Fiat-Shamir heuristic is proven secure in the Random Oracle model, where adversaries have to use the Random Oracle as a black-box. There are negative results about the Random Oracle model \cite{canetti2004random, maurer2004indifferentiability}, these results show that there are schemes that are secure in the Random Oracle model, but completely broken when instantiated by any hash functions. However, their counter-examples are \textit{special} schemes that do not look like any practical scheme, therefore the Random Oracle model is still believed to be safe for \textit{normal} protocols.
+
+\section{Sample Random Number from Uniform Distribution}
+
+We use ChaCha20 pseudorandom generator (PRNG) to generate random bytes.
+
+\begin{ealgorithm}[Sample a $b$-bit positive number]
+\textup{
+\begin{enumerate}
+    \item Use PRNG to generate $b / 8$ random bytes.
+    \item Set $8 - (b \bmod 8)$ most-significant bits to 0.
+\end{enumerate}
+}
+\end{ealgorithm}
+
+\begin{ealgorithm}[Sample from $[0, x)$]
+\textup{
+\begin{enumerate}
+    \item Let $b$ be the number of bits in $x$.
+    \item Generate $r$: $b$-bit uniform random number.
+    \item If $r < x$, return $r$.
+    \item Go to step 2.
+\end{enumerate}
+}
+\end{ealgorithm}
+
+\begin{ealgorithm}[Sample from $\range{-x, x}$]
+\textup{
+\begin{enumerate}
+    \item Let $b$ be the number of bits in $x$.
+    \item Generate $r$: $b$-bit uniform random number.
+    \item If $r \le x$, go to step 5.
+    \item Go to step 2.
+    \item Use PRNG to generate a random uniform boolean $s$.
+    \item If $s = True$ return $-r$, else return $r$.
+\end{enumerate}
+}
+\end{ealgorithm}
+
+\section{Sample Random Prime Numbers}
+
+The verifier needs to generate a random $O(\lambda)$-bit number. We choose the method of Fouque and Tibouchi \cite{fouque2014close}, which we summarized in this section.
+
+The algorithm takes parameters:
+\begin{itemize}
+    \item $n$: Maximum bit size of generated prime.
+    \item $l$: Control the speed of the algorithm and statistical distance from uniform distribution, larger $l$ means slower and smaller distance.
+\end{itemize}
+
+\textbf{Setting up.} Compute $m = p_1 p_2 \dots p_k$ such that $m$ has $n - l$ bits, where $p_i$ is $i$-th odd prime.
+
+\begin{ealgorithm}[Generate prime number]
+\quad
+
+\textup{\textbf{Output:} a prime number.\\
+$\mathsf{GenPrime}(n, l)$
+\begin{enumerate}
+    \item $b \rand \{1, \dots, m-1\}$
+    \item $u \gets (1 - b^{\lambda(m)}) \bmod m$
+    \item While $u \ne 0$:
+    \item \quad $r \rand \{1, \dots, m-1\}$
+    \item \quad $b \gets b + ru$
+    \item \quad $u \gets (1 - b^{\lambda(m)}) \bmod m$
+    \item Repeat
+    \item \quad $\alpha \rand \{0,\dots,\lfloor 2^n / m \rfloor - 1\}$
+    \item \quad $p \gets \alpha m + b$
+    \item Until $p$ is prime
+    \item Return $p$
+\end{enumerate}
+}
+\end{ealgorithm}
+
+$\lambda(m)$ is the Carmichael function, we have $\lambda(p) = p - 1$ for a prime $p$, $m = \prod_{i=1}^k p_i$ therefore $\lambda(m) = \mathsf{lcm}(p_1 - 1,\dots,p_k - 1)$.
+
+Step 1 to 6 generate $b < m$ and coprime to $m$, according to \cite{joye2006fast}.
+
+In step 10 we use GMP's primality check  (\href{https://gmplib.org/manual/Number-Theoretic-Functions}{\texttt{mpz\_probab\_prime\_p}}), with \texttt{resp = 60}.  A composite number will be identified as a prime with an asymptotic probability of less than $4^{-\mathrm{reps}}$.
+
+
+\textbf{Analysis.} Expected number of primality tests:
+$$\frac{n \log 2 \cdot \mathrm{e}^{-\gamma}}{\log(n-1) + \log \log 2}$$
+where $\gamma$ is Euler-Mascheroni constant. Statistical distance:
+$$\Delta < 3 \log^2 x \cdot \sqrt{\frac{\varphi(m)}{x}}$$
+where $x = m \cdot \lfloor 2^n / m \rfloor \approx 2^n$.
+
+\section{Polynomial Multiplication}
+
+We use Kronecker substitution to reduce multiplication of polynomials in $\Z[X]$ to multiplication of large integers, then we use big-integer libraries to multiply the integers.
+
+\textbf{Kronecker substitution:} To multiply two integer polynomials with positive coefficients $f(X)$ and $g(X)$ , compute $p \gets f(2^m) \times g(2^m)$ for some big $m$, then read the resulted polynomial $h(X)$ from binary representation of $p$.
+
+\textbf{Correctness condition:} $m$ must be chosen such that $2^m$ is larger than all coefficients of $h(X)$.
+
+Let $d =\min(\mathrm{deg}(f(X)), \mathrm{deg}(g(X)))$.
+Let $\mathrm{G}$ be the largest coefficient of $g(X)$.
+Let $\mathrm{F}$ be the largest coefficient of $f(X)$.
+We have:
+$$m = \lceil \log_2(GF(d+1)) \rceil = \lceil \log_2 G + \log_2 F + \log_2 (d+1) \rceil$$
+
+\textbf{Negative coefficients:} To compute $g(X) f(X)$ where $f(X)$ can have negative coefficients, we split $f(X)$ into $f_0(X)$ and $f_1(X)$. $f_0(X)$ contains positive terms, $f_1(X)$ contains absolute value of negative terms. Therefore $g(X) f(X) = g(X) f_0(X) - g(X) f_1(X)$.
+
+\section{Source Code details}
+
+We implement Supersonic in the Rust programming language. DARK commitment is implemented in \texttt{commit/}, Sonic is implemented in \texttt{sonic/}.
+
+The code was tested in Linux environment. Dependencies:
+\begin{enumerate}
+    \item Rust compiler and \texttt{cargo} build tool.
+    \item C and C++ compilers.
+    \item \texttt{m4} and \texttt{make}.
+    \item GMP library and headers.
+    \item OpenSSL library and headers.
+\end{enumerate}
+
+Tests are run by running \texttt{cargo test -{}-release} in each folders \texttt{commit/} and \texttt{sonic/}.
+
+We perform extensive checks in the code to make sure it is correct, this will slow down the execution time. It is recommended to pass \texttt{-{}-features no-assert} when measuring performance.
+
+\section{Experimentation}
+
+We run Supersonic from start to finish, including the steps:
+\begin{itemize}
+    \item Generate parameters for DARK.
+    \item Generate an arithmetic circuit $C$ ($C$ is either SHA-256 circuit or exponentiation-by-squaring circuit).
+    \item Sample a random input $\Vec{w}$ and evaluate $\Vec{x} \gets C(\Vec{w})$.
+    \item Let $C'$ be a circuit such that $C(\Vec{w}) = \Vec{x} \iff C'(\Vec{w}, \Vec{x}) = 0$. $C'$ also contains checks on binary inputs of $C$, i.e. check that $w_i \in \{0, 1\}$ via the equation $(w_i - 1) \cdot w_i = 0$.
+    \item Evaluates $C'(\Vec{w}, \Vec{x})$ to get Sonic's witness $\Vec{a, b, c}$.
+    \item Get Sonic's instance $\{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$ from $C'$ and $x$.
+    \item Compute witness $R(X, Y)$, and instance $S(X, Y)$, $k(Y)$.
+    \item Produce non-interactive proof $\pi$.
+    \item Verify non-interactive proof $\pi$.
+\end{itemize}
+
+During these step, we record the following metrics:
+\begin{itemize}
+    \item $n$: the length of vectors $\Vec{a}, \Vec{b}, \Vec{c}$.
+    \item $S(X, Y)$ size: number of non-zero coefficients in $S(X, Y)$.
+    \item $k(Y)$ size: number of non-zero coefficients in $k(Y)$.
+    \item $d$: Degree of combined polynomial.
+    \item Proof's size.
+    \item Prover's running time.
+    \item Verifier's running time.
+    \item Exponent's size in group exponentiation. 
+\end{itemize}
+
+We also perform various unit-tests, including, but not limited to:
+\begin{itemize}
+    \item Check that SHA-256 circuit is correct, by evaluating it an compare the result with library's SHA-256 implementation.
+    \item Check that exponentiation-by-squaring circuit is correct.
+    \item Check the conversion from 32-bit circuit to arithmetic circuit, by comparing the output.
+    \item Perform a lot of assertions in the code.
+\end{itemize}
+
+\subsection{Exponentiation Circuits}
+
+We run exponentiation-by-squaring circuit with various exponent sizes. The proof is for relation $\mathcal{R}(p, b) = \{\pair{(u, v)}{e} : u^e = v \pmod p \}$, exponent $e$ is represented as a $b$-bit number.
+
+Table \ref{tab:powmod-result} shows results when running with various exponent's bit-sizes. The result can be recreated with the script \texttt{sonic/run\_powmod.bash}.
+
+\begin{table}[!htp]
+\centering
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+$b$ & $n$ & $S(X, Y)$ & $k(Y)$ & $d$  & Proof size & Prover & Verifier \\ \hline
+8   & 103 & 564       & 6      & 721  & 12Kb       & 28s    & 120ms    \\ \hline
+16  & 199 & 1100      & 11     & 1393 & 13Kb       & 55s    & 122ms    \\ \hline
+32  & 391 & 2172      & 20     & 2737 & 14Kb       & 106s   & 140ms    \\ \hline
+64  & 775 & 4316      & 34     & 5452 & 15Kb       & 210s   & 160ms    \\ \hline
+\end{tabular}
+\caption{Running exponentiation Circuits}
+\label{tab:powmod-result}
+\end{table}
+
+Computing Proof of Exponentiation took most of prover's running time. In the largest test, the prover had to compute exponentiation in 3048-bit RSA group where the exponents have, in total, 9 million bits.
+
+\subsection{SHA-256 circuit}
+
+We also implement \textit{non-padding} SHA-256 circuit that maps 512-bit input to 256-bit output. Table \ref{tab:sha256-result} contains some metrics and estimations.
+
+\begin{table}[!htp]
+\centering
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+$n$    & $S(X, Y)$     & $k(Y)$    & $d$      & Proof size (est.) & Prover (est.) & Verifier (est.) \\ \hline
+404996 & 2289676       &  266      & 2834972  & 32Kb       & 68 hours    & 5s    \\ \hline
+\end{tabular}
+\caption{Running SHA-256 circuit}
+\label{tab:sha256-result}
+\end{table}
+
+Running time and proof size are estimated because we could not afford running the computation. We use $b = 8$ in table \ref{tab:powmod-result} as the basic for our estimation.
+
+\textbf{Proof size.} Sonic's proof contains 7 group elements for commitment of $r(X, 1), t(X, y), t_L(X, y), t_H(X, y)$ and PoE proofs for shifting $r(X, y), t_L(X, y), t_H(X, y)$. 7 3048-bit RSA group elements take about 2Kb, the rest is $O(\log_2 d)$ group elements. Field elements are small so we omit them in the estimation.
+
+\textbf{Prover running time.} Prover running time is $O(d \log_2 d)$.
+
+\textbf{Verifier running time.} Evaluating $S(X, Y)$ with 2 million coefficients takes 4 seconds, DARK's time complexity is $O(\log_2 d)$.
+
+\subsection{DARK performance}
+
+We also measure performance of $\aJoinedEval$ and $\aEvalBounded$, with every degree $d$ we do the following steps,
+\begin{itemize}
+    \item Generate proving key for polynomials with maximum degree $d$.
+    \item Save the key and read it again to measure key verification performance.
+    \item Sample 4 polynomials with different degrees and evaluate them on a point $z$.
+    \item Run $\aJoinedEval$ on the polynomials and measure:
+    \begin{itemize}
+        \item The time it takes to combine the 4 polynomials.
+        \item Total running time of $\aEvalBounded$.
+        \item For each round of $\aEvalBounded$, measure the time it takes to compute:
+        \begin{itemize}
+            \item Commitment of $f_H(X)$.
+            \item Proof of exponentiation.
+        \end{itemize}
+    \end{itemize}
+    \item Proof's size.
+    \item Verification time.
+\end{itemize}
+
+Table \ref{tab:dark-performance} and \ref{tab:prover-performance} show the results for $d=100$, $d=1000$, and $d=10000$. The result can be re-created using the script \texttt{commit/run\_combined.bash}.
+
+\begin{table}[!htp]
+\centering
+\begin{tabular}{|l|l|l|l|l|l|l|}
+\hline
+d     & Key gen. & Key verify & Combine & Eval & Verify & Size   \\ \hline
+100   & 2s       & 134ms      & 2.2s    & 2.3s & 86ms   & 8.9Kb  \\ \hline
+1000  & 23s      & 1.4s       & 35s     & 22s  & 96ms   & 11.5Kb \\ \hline
+10000 & 275s     & 13s        & 308s    & 204s & 203ms  & 15Kb   \\ \hline
+\end{tabular}
+\caption{DARK performance}
+\label{tab:dark-performance}
+\end{table}
+
+\begin{table}[!htp]
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+Round & Degree & Commit & PoE  \\ \hline
+1     & 9999   & 2.6s   & 87s  \\ \hline
+2     & 4999   & 1.9s   & 50s  \\ \hline
+3     & 2499   & 1.1s   & 25s  \\ \hline
+4     & 1249   & 642ms  & 13s  \\ \hline
+5     & 624    & 363ms  & 6.6s \\ \hline
+6     & 312    & 220ms  & 3.3s \\ \hline
+7     & 156    & 140ms  & 1.8s \\ \hline
+8     & 78     & 54ms   & 1s   \\ \hline
+\end{tabular}
+\caption{DARK prover performance}
+\label{tab:prover-performance}
+\end{table}
+
+We explain the columns of table \ref{tab:dark-performance}:
+\begin{itemize}
+    \item Key gen.: key generation.
+    \item Key verify: key verification.
+    \item Combine: combining polynomials.
+    \item Eval: running time of $\aEvalBounded$.
+    \item Verify: proof verification.
+    \item Size: proof size.
+\end{itemize}
+
+We explain the columns of table \ref{tab:prover-performance}:
+\begin{itemize}
+    \item Degree: Degree of $f(X)$ in this round.
+    \item Commit: Time to compute commitment of $f_H(X)$.
+    \item PoE: Time to compute proof-of-exponentiation.
+\end{itemize}
+
+From the result, we can see that running proof of exponentiation takes most of prover running time.

@@ -1,0 +1,29 @@
+\chapter{Conclusion}
+\label{chap-conclusion}
+
+\section{Result}
+
+In this thesis, we study zero-knowledge proof and related concepts, we also study and implement a state-of-the-art zero-knowledge proof system - Supersonic. Exhaustively,
+\begin{itemize}
+    \item We study how to characterize and define the security of zero-knowledge proof and proof of knowledge system, and how to prove their security using the General Forking lemma. We also study related concepts such as commitment scheme, Random Oracle models and falsifiable assumptions.
+    \item We reconstruct Sonic step by step, and apply modifications to make it compatible with DARK polynomial commitment scheme.
+    \item We show how to build arithmetic circuits and how to use arithmetic circuits in Sonic.
+    \item We study techniques that are needed when implementing Supersonic, namely, the Fiat-Shamir heuristic, how to sample random prime numbers, and simple polynomial multiplication using Kronecker substitution.
+    \item We provide an implementation of Supersonic, we run it on exponentiation-by-squaring circuit and provide estimation for running time of SHA-256 circuit. The implementation is embarrassingly parallel and decently tested.
+    \item We extend the original $\aJoinedEval$ protocol to handle $m$ polynomials with different degrees at $k$ points.
+\end{itemize}
+
+\section{Open Problems and Future Works}
+
+We list some open problems with Supersonic and our implementations:
+\begin{itemize}
+    \item The construction is based on the Adaptive Root assumption, which is a new assumption and needs more studies on its hardness.
+    \item Our implementation does not support running on class groups. To add class groups support, these methods are needed: generating a safe class group, sample an element from a class group, multiply and exponentiation operators.
+    \item In \cite{bunz2020transparent}, it is suggested that a more careful analysis could allow sampling challenges from $[-2^\lambda, -2^\lambda]$, instead of $[-(p-1)/2, (p-1)/2]$, which will make it more practical to run proofs of computations on larger prime field $p$.
+    \item Prover running time is slow, mainly due to $q$'s size and computing PoE proof.
+    \item Our implementation is not fully succinct (proof size is succinct but verifier running time is linear to the circuit size). Sonic can be make fully succinct using polynomial permutation arguments, however, this will add considerable computing time to the prover.
+    \item Multi-exponentiation techniques \cite{borges2017parallel} can be applied to impove prover's performance.
+    \item We aimed for simplicity, so our techniques to build and transform arithmetic circuits is not efficient. Improvements could decrease polynomials degree and thus improve prover performance.
+\end{itemize}
+
+Supersonic opens an opportunity for an efficient Transparent SNARKs. However, in our opinion, much work is needed to make the protocol more practical, especially in the prover running time.

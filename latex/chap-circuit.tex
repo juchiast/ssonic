@@ -1,0 +1,368 @@
+\chapter{Arithmetic Circuit}
+\label{chap-circuit}
+
+Combining chapter \ref{chap-sonic} and chapter \ref{chap-dark}, we get a zero-knowledge argument of knowledge for the relation $\RSonic$. However, the Sonic constraints system, which is a system of equations, is not intuitive to use. For example, it is not straightforward how to write a constraints system to check the correctness of SHA-256 hashes. Therefore, this chapter is devoted to:
+\begin{itemize}
+    \item Defining a model to represent circuits. We choose Directed Acyclic Graph (DAG), with multiple vertex types, each vertex has 2 fan-in and unlimited fan-out.
+    \item How to program an arithmetic circuit. The goal is to provide a programming methodology to write a function that returns an arithmetic circuit representing some algorithm, while looking as normal as possible.
+    \item How to transform binary operations to $+, -$ and $\times$ in $\Z_p$.
+    \item How to reduce circuit satisfiability $\Rsat = \{\langle (C, \Vec{x}), \Vec{w} \rangle : C(\Vec{x}, \Vec{w}) = \Vec{0}\}$ to $\RSonic$.
+\end{itemize}
+
+As a result, we provide an implementation of SHA-256 circuit and exponentiation circuit.
+
+\textbf{Remark:} We took a generic approach: implement a circuit then transform the circuit into a constraints system. However, it is possible (and often more efficient) to write the constraints directly. For example, to check a binary addition of 32-bit numbers $a + b = c$, where $a, b, c \in \{0, 1\}^{32}$, we could:
+\begin{enumerate}
+    \item Write a 32-bit-add circuit $C: \F^{32} \times \F^{32} \to \F^{32}$, this will not be efficient, because simulating "add-with-carry" in a finite field $\F$ would lead to a lot of gates.
+    \item Let $x \gets \sum_{i=0}^{31} a_i 2^i$, $y \gets \sum_{i=0}^{31} b_i 2^i$, $z \gets \sum_{i=0}^{31} c_i 2^i$ and check that $x + y = z$, where $x, y, z \in \Z_p$. The values of $2^i$ can be pre-computed and $\Z_p$ needs to be large enough to hold all 32-bit values. This takes one addition and one multiplication for each bit, which is much more efficient that the first approach.
+\end{enumerate}
+In fact, bellman\footnote{\url{https://docs.rs/bellman/0.6.0/bellman/}}, a popular SNARKs library, uses the second approach. Each circuit implement a "Circuit" interface that has a "synthesize" function, where the circuit will manually enforce constraints on the variables. We did not use bellman in our implementation because it is not clear how compatible bellman ans Sonic are. We did not use bellman's approach because it is harder to test the correctness of the computation and the constraints, and the programming interface is generally more complicated.
+
+\section{Definitions}
+
+\begin{definition}[Circuit]
+\label{def-circuit}
+Let $\S$ be a set and $F = \{f_i: \S \times \S \to \S \}_i$ be a set of operators on $\S$.
+A Circuit operating on $\S$ is a multi-edge directed acyclic graph $G = (V, E, O, F)$ where $O \subset V$ is an ordered set defining the output of the circuit and each vertex $v \in V$ is one of the types:
+\begin{itemize}
+    \item Input vertex: $v \in \N$, $\aIndeg(v) = 0$.
+    \item Constant vertex: $v \in \S$, $\aIndeg(v) = 0$.
+    \item Operator: $v \in F$, $\aIndeg(v) = 2$.
+\end{itemize}
+For each operator $v$, $\aLeft(v), \aRight(v) \in V$ is the left input and right input of $v$.
+
+Output of the circuit is a set of vertices $O \subset V$.
+\end{definition}
+
+Input vertex $v$ is a number that specifies the index of the value in input array. We describe a recursive function to evaluate a vertex.
+
+\begin{ealgorithm}[Evaluate a vertex]
+Below is an algorithm to evaluate the value of a vertex, given input vector $\Vec{x} \in \S^k$.
+
+\textup{
+$\aEvaluate(v \in V, \Vec{x} \in \S^k):$
+\begin{itemize}
+    \item If $v \in \N$ then return $x_v$.
+    \item If $v \in \S$ then return $v$.
+    \item Return $v(\aEvaluate(\aLeft(v), \Vec{x}), \aEvaluate(\aRight(v), \Vec{x}))$.
+\end{itemize}
+}
+\end{ealgorithm}
+ 
+We can also evaluate the circuit by first topo-sort it, then loop though the vertices list and use an array to cache the results.
+
+\textbf{Linear Circuit.} We call a topo-sorted circuit Linear Circuit.
+
+\begin{definition}[Linear Circuit]
+\label{def-linear-circuit}
+A Linear Circuit is a tuple $(\aIdx, G)$ where $G$ is a Circuit as defined in \ref{def-circuit}, $\aIdx: V \to \N$, $\aIdx(v)$ is the index of $v$ in the topo-sorted list of $V$.
+\end{definition}
+
+\begin{ealgorithm}[Topo-sort for Circuit]
+\label{algo-toposort}
+\quad
+
+\textup{
+Input: $G = (V, E, O, F)$
+\begin{enumerate}
+    \item Let $\mathrm{deg_0} \gets \{ v \in V \wedge \aIndeg(v) = 0 \}$ be a FIFO queue.
+    \item Let $\mathrm{deg_1} \gets \varnothing$.
+    \item Let $r \gets \varnothing$ be a FIFO queue.
+    \item While $\mathrm{deg_0}$ is not empty:
+    \item \quad Let $u \gets \mathsf{pop}(\mathrm{deg_0})$.
+    \item \quad $\mathsf{push}(r, u)$.
+    \item \quad For all $v$ where $(u, v) \in E$:
+    \item \quad \quad If $v \in \mathrm{deg_1}$ then $\mathsf{remove}(\mathrm{deg_1}, v)$ and $\mathsf{push}(\mathrm{deg_0}, v)$.
+    \item \quad \quad Otherwise $\mathsf{insert}(\mathrm{deg_1}, v)$.
+    \item Return $r$.
+\end{enumerate}
+}
+\end{ealgorithm}
+
+If $\mathrm{deg_1}$ is implemented by a balanced binary tree, then algorithm \ref{algo-toposort} has time complexity $O(|V| \log |V|)$.
+
+\textbf{Arithmetic Circuit.} We define arithmetic circuit on the field $\Z_p$ for an odd prime $p$ and we show how to reduce Arithmetic Circuit Satisfiability to $\RSonic$.
+
+\begin{definition}[Arithmetic Circuit]
+\label{def-arithmetic-circuit}
+Let $+, -, \times$ be addition, subtraction, and multiplication operators in $\Z_p$ where $p$ is an odd prime, let $F = \{ +, -, \times \}$. Arithmetic Circuit over $\Z_p$ is a circuit $G = (V, E, O, F)$ as defined in \ref{def-circuit}.
+\end{definition}
+
+
+\subsection{Composing Circuits}
+
+When using SNARKs, we often need to prove statements that are expressed as an algorithm: it has random memory accesses, variables, for-loop, if-condition, early returns, etc. We want to find a way to transform such algorithms into arithmetic circuits.
+
+We replace each variable in a program by a pointer to a vertex, and implement necessary operators for that pointer. For example, in a normal program, $a = b + c;$ add two Int $a, b$ and set the result to $c$, when writing a circuit, $b$ and $c$ are both pointers to some vertices, and the $+$ operator is implemented such that it allocate a new $+$ vertex with $b$ and $c$ as inputs, and return pointer to that vertex, $a$ is now a pointer to a vertex and can be used in other compositions.
+
+For-loop only works when the number of iteration is \textit{constant}, circuits are non-uniform computation model, a different input length needs to be processed by a different circuit.
+
+If-condition is more tricky, we can write a $\mathsf{select}(x, y, b)$ that return $x$ when $b = 0$ and return $y$ when $b = 1$, by doing $\mathsf{select}(x, y, b) = x \times (1 - b) + y \times b$.
+
+The above construction is enough to implement SHA-256 circuit and exponentiation circuit in our experiments. It is non-trivial to analyze the size of the circuit. If there is no if-condition, the size of the circuit is linear to the running time of the program. However, the circuit needs to go though all branches of an if-condition, otherwise each input will produce a different circuit.
+
+\section{Transforming Circuit Satisfiability to Sonic Constraints System}
+
+We denote $\Z_p$ as $\F$.
+
+\begin{definition}[Arithmetic Circuit Satisfiability]
+Let $C = (V, E, O, F)$ be an arithmetic circuit operating on $\F$, $F = \{ +, -, \times \}$ is the set of operators, $V$ is the set of vertices, $E \subset V \times V$ is the set of edges, $O \subset V$ is the ordered set of output vertices. Let $N$ be the number of input vertices of $C$, we have $v \in \{1, \dots, N\}$ for each input vertices $v$. We divide the input vertices into $m$ left-input vertices and $k$ right-input vertices, we have $m+k=N$. Let $\Vec{x} \in \F^m$ be the left-input of the circuit and $\Vec{w} \in \F^k$ be the right-input of the circuit.
+
+We define the Arithmetic Circuit Satisfiability problem using a relation $\Rsat$, let $C$ be an arithmetic circuit on a prime field $\F$, $\Vec{x}, \Vec{w} \in \F^*$,
+$$\Rsat = \{ \langle (C, \Vec{x}), \Vec{w} \rangle : C(\Vec{x}, \Vec{w}) = \Vec{0} \}$$
+\end{definition}
+
+We show how to get $x = \{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$ and $w = (\Vec{a}, \Vec{b}, \Vec{c}) \in \F^{3n}$ such that $$\pair{x}{w} \in \RSonic \iff \pair{(C, \Vec{x})}{\Vec{w}} \in \Rsat$$
+
+Recalling that $\pair{x}{w} \in \RSonic$ is equivalence to:
+\begin{align*}
+\forall i \in [n],\quad & a_i b_i = c_i \\
+\forall q \in [Q],\quad & \inner{\Vec{u}_q}{\Vec{a}} + \inner{\Vec{v}_q}{\Vec{b}} + \inner{\Vec{w}_q}{\Vec{c}} = k_q
+\end{align*}
+
+The idea is:
+\begin{itemize}
+    \item Store all edge's values in vectors $\Vec{a}, \Vec{b}, \Vec{c}$.
+    \item Use constraints $a_i b_i = c_i$ to check $\times$ vertices.
+    \item Use constraints $\inner{\Vec{u}_q}{\Vec{a}} + \inner{\Vec{v}_q}{\Vec{b}} + \inner{\Vec{w}_q}{\Vec{c}} = k_q$ to: check $+$ and $-$ vertices; connect the vertices (i.e. enforce that output of $v$ is input of $u$); check the values of $\Vec{x}$; check values of constant vertices; check that all values output vertices are $0$.
+\end{itemize}
+
+This way, interactive argument for $\Rsat$ actually prove that the prover know all edge values . While running interactive argument, $\mP$ has $\Vec{w}$ and $\mV$ has $\Vec{x}$ and $C$. Consequently, $\mV$ must be able to compute $\{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$ from $C$ and $\Vec{x}$, without any knowledge of the values in $\Vec{w}$. $\mP$ will compute $(\Vec{a}, \Vec{b}, \Vec{c})$ from $\Vec{w}$, $\Vec{x}$ and $C$.
+
+Therefore, we split this section into two parts:
+\begin{enumerate}
+    \item Verifier's transformation: $(C, \Vec{x}) \mapsto \{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$.
+    \item Prover's transformation: $(C, \Vec{x}, \Vec{w}) \mapsto (\Vec{a}, \Vec{b}, \Vec{c})$.
+\end{enumerate}
+
+\subsection{Verifier's Transformation}
+
+\textbf{Input.} $C = (V, E, O, F)$, $\Vec{x} \in \F^m$.
+
+\textbf{Output.} $\{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$ where $\Vec{u}_q, \Vec{v}_q, \Vec{w}_q \in \F^n$ and $k_q \in \F$ for all $i \in [Q]$.
+
+Each pair $(\Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q)$ represent a constraint
+$$\inner{\Vec{u}_q}{\Vec{a}} + \inner{\Vec{v}_q}{\Vec{b}} + \inner{\Vec{w}_q}{\Vec{c}} = k_q$$
+
+However, we will be using simpler constraint forms:
+\begin{itemize}
+    \item $a_i \pm b_j \pm c_k = 0$ for some $u, j, k \in [n]$
+    \item $c_i = k$ for some $i \in [n]$ and $k \in \F$.
+    \item $a_i - c_j = 0$ for some $i, j \in [n]$.
+    \item $b_i - c_j = 0$ for some $i, j \in [n]$.
+\end{itemize}
+
+For each type of constraint listed above, we derive a pair $(\Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q)$ where values of $\Vec{u}_q, \Vec{v}_q, \Vec{w}_q$ are in $\{-1, 0, 1\}$.
+
+Let $\aIdx: V \to \N$ such that $\aIdx(v)$ is the index of vertex $v$ in the topo-sorted list of $C$. Let $\alpha$ be the number of $+$ and $-$ vertices in $C$. For simplicity, let $a_v, b_v, c_v$ denote $a_{\aIdx(v)}, b_{\aIdx(v)}, c_{\aIdx(v)}$, let $a'_v, b'_v, c'_v$ denote $a_{\aIdx(v) + \alpha}, b_{\aIdx(v) + \alpha}, c_{\aIdx(v) + \alpha}$.
+
+For each vertex $v$, we want to use $c_v$ to represent the output of $v$, $a_v$ and $b_v$ represent the left and right input of $v$. However, we need $a_v b_v = c_v$ so we cannot also enforce $a_v + b_v = c_v$ for $+$ vertices, same goes for $-$ vertices. Therefore, for $+$ and $-$ vertices, we use $a_v, b_v$ to represent the inputs, and $c'_v$ to represent the output. Values of $c_v, a'_v, b'_v$ are redundantly set so that $a_i b_i = c_i$ for all $i$. Therefore, we need $|V| + \alpha$ values in each vector $\Vec{a}, \Vec{b}, \Vec{c}$, i.e. $\Vec{a}, \Vec{b}, \Vec{c} \in \F^n$ where $n = |V| + \alpha$.
+
+We define a function $\aOut$,
+\[
+\aOut(v) =
+\begin{cases}
+    c'_v & \quad \text{if $v$ is $+, -$ vertex} \\
+    c_v & \quad \text{otherwise}
+\end{cases}
+\]
+
+Finally, we describe how to generate the constraints.
+
+For each left-input vertex $v \in V$:
+\begin{itemize}
+    \item We have $v \in \N$, add a constraint $\aOut(v) = x_v$.
+\end{itemize}
+
+For each constant vertex $v \in V$:
+\begin{itemize}
+    \item We have $v \in \F$, add a constraint $\aOut(v) = v$.
+\end{itemize}
+
+For each output vertex $v \in O$:
+\begin{itemize}
+    \item Add a constraint $\aOut(v) = 0$.
+\end{itemize}
+
+For each $+$ vertex $v \in V$:
+\begin{itemize}
+    \item Add a constraint $a_v + b_v - \aOut(v) = 0$.
+\end{itemize}
+
+For each $-$ vertex $v \in V$:
+\begin{itemize}
+    \item Add a constraint $a_v - b_v - \aOut(v) = 0$.
+\end{itemize}
+
+For each $+, -, \times$ vertex $v \in V$:
+\begin{itemize}
+    \item Let $u \gets \aLeft(v)$, add a constraint $a_v - \aOut(u) = 0$.
+    \item Let $u \gets \aRight(v)$, add a constraint $b_v - \aOut(u) = 0$.
+\end{itemize}
+
+\subsection{Prover's Transformation}
+
+We describe how the prover gets the values of $\Vec{a}, \Vec{b}, \Vec{c}$ from $C, \Vec{x}, \Vec{w}$.
+
+The prover uses $(\Vec{x}, \Vec{w})$ to evaluate the circuit $C$, we define by $\aValue(v)$ the output of vertex $v$, $\aValue: V \to \F$.
+
+We need to set the values of $a_v, b_v, c_v$ for each vertex $v$, and additionally $a'_v, b'_v, c'_v$ if $v$ is $+, -$ vertex.
+
+For each input vertex $v \in V$:
+\begin{itemize}
+    \item Set $\aOut(v) \gets \aValue(v)$.
+    \item Set $a_v \gets \aValue(v)$.
+    \item Set $b_v \gets 1$.
+\end{itemize}
+
+For each constant vertex $v \in V$:
+\begin{itemize}
+    \item Set $\aOut(v) \gets \aValue(v)$.
+    \item Set $a_v \gets \aValue(v)$.
+    \item Set $b_v \gets 1$.
+\end{itemize}
+
+For each $+, -$ vertex $v \in V$:
+\begin{itemize}
+    \item Set $\aOut(v) \gets \aValue(v)$.
+    \item Set $a_v \gets \aValue(\aLeft(v))$.
+    \item Set $b_v \gets \aValue(\aRight(v))$.
+    \item Set $a'_v \gets \aOut(v)$.
+    \item Set $b'_v \gets 1$.
+    \item Set $c_v \gets a_v b_v$.
+\end{itemize}
+
+For each $\times$ vertex $v \in V$:
+\begin{itemize}
+    \item Set $\aOut(v) \gets \aValue(v)$.
+    \item Set $a_v \gets \aValue(\aLeft(v))$.
+    \item Set $b_v \gets \aValue(\aRight(v))$.
+\end{itemize}
+
+With the above steps, we have all values of $\Vec{a}, \Vec{b}, \Vec{c}$ assigned.
+
+\section{Boolean Circuits}
+
+This section describes how to represent binary computations such as AND, OR, XOR, 32-bit Add, etc.
+
+Each $b$-bit variable is 32 vertices, each vertices represent one bit of the variable. Bit-0 is $0$ in $\Z_p$ and bit-1 is $1$ in $\Z_p$.
+
+\textbf{Check that $x \in \{0, 1\}$}. We have $x \in \{0, 1\} \iff (x - 1) \times x = 0$.
+
+\textbf{NOT.} It is easy to see that $\aNot a = 1 - a$.
+
+\textbf{AND.} It is easy to see that $a \aAnd b = a \times b$ when $a, b \in \{0, 1\}$.
+
+\textbf{OR.} $a \aOr b = 1$ unless $a = b = 0$. We see that $a + b = a \aOr b$, unless for $a = b = 1$, we take care of this case by doing $a + b - a \times b$. Therefore, $a \aOr b = a + b - a \times b$.
+
+\textbf{XOR.} $a \aXor b = 0$ if $a = b$, therefore $a \aXor b = a - b$, however, when $a \ne b, a - b = \pm 1$. Finally, we have $a \aXor b = (a - b)^2$.
+
+\textbf{Add-with-carry.} From $x, y, c \in \{0, 1\}$, we need to compute $s, c_1$ such that
+\begin{align*}
+    s &= (x + y + c) \bmod 2 \\
+    c_1 &= \lfloor (x + y + c) / 2 \rfloor
+\end{align*}
+We have $s = x + y + c - 2 \times c_1$. Examining the value of $c_1$:
+\begin{itemize}
+    \item If $x + y = 0$, $c_1 = 0$.
+    \item If $x + y = 1$, $c_1 = c$.
+    \item If $x + y = 2$, $c_1 = 1$.
+\end{itemize}
+
+The first two cases can be summarized as $c_1 = (x + y) \times c$, we have:
+\begin{itemize}
+    \item If $x + y \ne 2$, $c_1 = (x + y) \times c$.
+    \item If $x + y = 2$, $c_1 = 1$.
+\end{itemize}
+
+We have that $x + y \in \{0, 1\} \iff [(x + y) - 1](x + y)$, when $x + y = 2$, we have $[(x + y) - 1](x + y) = 2$, we can compute $b$ such that $b = 0$ when $x + y \in \{0, 1\}$ and $b = 1$ when $x + y = 2$ as follow:
+\begin{itemize}
+    \item $b = 2^{-1} \times [(x + y) - 1](x + y)$.
+\end{itemize}
+
+Finally, we have $c_1 = \mathsf{select}((x + y) \times c, 1, b)$, where $\mathsf{select}(x, y, b) = x \times (1 - b) + y \times b$.
+
+We conclude add-with-carry below:
+\begin{ealgorithm}[Add-with-carry]
+\quad
+
+\textup{Input: $x, y, c$.\\
+Output: $s, c_1$.\\
+$\aAWC(x, y, c):$
+\begin{itemize}
+    \item $z \gets x + y$
+    \item $b \gets 2^{-1} \times (z - 1) \times z$
+    \item $t \gets z \times c$
+    \item $c_1 \gets t \times (1 - b) + b$
+    \item $s \gets z + c - 2 \times c_1$
+    \item Return $s, c_1$
+\end{itemize}
+}
+\end{ealgorithm}
+
+\textbf{$b$-bit add.} Adding two $b$-bit number is done by repeatedly doing add-with-carry.
+
+\textbf{Shifts and rotates.} A $b$-bit number is an ordered set of $b$ vertices, rotating is done by rotating the set, shifting is done by removing some vertices and adding $0$-constant vertex at the end (or start) of the set.
+
+\subsection{Non-padding SHA-256 Circuit}
+
+With the above implementation basic Boolean operators, we can implement non-padding SHA-256 circuit that maps 16 32-bit numbers into 8 32-bit numbers.
+
+Let $\S$ be the set of 32-bit unsigned numbers. We describe SHA-256 algorithm in \ref{algo-sha256}.
+
+The constant $k$ and starting values of $r$ can be found in official documentation of SHA-256.
+
+In algorithm \ref{algo-sha256}, we use $\aRR$ for \textit{right-rotate} operator and $\aShr$ for \textit{shift-right} operator.
+
+\begin{ealgorithm}[Non-padding SHA-256]
+\label{algo-sha256}
+\quad
+
+\textup{Input: $x \in \S^{16}$ \\
+Output: $r \in \S^8$ \\
+SHA-256($x$):
+\begin{itemize}
+    \item Let $k \in \S^{64}$ be the SHA256 constants.
+    \item Let $r \in \S^8$ be the starting value constants.
+    \item Let $w \in \S^{64}$.
+    \item For $i$ from 0 to 15:
+    \item \quad $w_i \gets x_i$
+    \item For $i$ from 16 to 63:
+    \item \quad $s_0 \gets (w_{i-15} \aRR 7) \aXor (w_{i-15} \aRR 18) \aXor (w_{i-15} \aShr 3)$
+    \item \quad $s_1 \gets (w_{i-2} \aRR 17) \aXor (w_{i-2} \aRR 19) \aXor (w_{i-2} \aShr 10)$
+    \item \quad $w_i \gets w_{i-16} + s_0 + w_{i-7} + s_1$
+    \item Let $\{a,b,c,d,e,f,g,h\} \gets \{r_0,\dots,r_7\}$.
+    \item For $i$ from 0 to 63:
+    \item \quad $s_1 \gets (e \aRR 6) \aXor (e \aRR 11) \aXor (e \aRR 25)$
+    \item \quad $ch \gets (e \aAnd f) \aXor (\aNot e \aAnd g)$
+    \item \quad $t_1 \gets h + s_1 + ch + k_i + w_i$
+    \item \quad $s_0 \gets (a \aRR 2) \aXor (a \aRR 13) \aXor (a \aRR 22)$
+    \item \quad $m \gets (a \aAnd b) \aXor (a \aAnd c) \aXor (b \aAnd c)$
+    \item \quad $t_2 \gets s_0 + m$
+    \item \quad $h \gets g; g \gets f; f \gets e; e \gets d + t_1$
+    \item \quad $d \gets c; c \gets b; b \gets a; a \gets t_1 + t_2$
+    \item $r_0 \gets r_0 + a; \dots; r_7 \gets r_7 + h$
+    \item Return $r$
+\end{itemize}
+}
+\end{ealgorithm}
+
+\subsection{Exponentiation Circuit}
+
+We also implement \textit{exponentiation-by-squaring} circuit. The circuit gets $x \in \Z_p$ and $e \in \{0, 1\}^b$ and compute $x^e$, the exponent is expressed as a $b$-bit number. The circuit can be used in argument of knowledge of either $x$ or $e$.
+
+\begin{ealgorithm}[Exponentiation-by-squaring]
+\label{algo-expo}
+\quad
+
+\textup{Input: $x \in \Z_p, e \in \{0, 1\}^b$, $e$ is in least-significant-first bit order. \\
+$\mathsf{EXP}(x, e)$:
+\begin{itemize}
+    \item $r \gets 1$
+    \item For i from 0 to $b-1$:
+    \item \quad $r \gets r \times (1 - e_i) + r \times x \times e_i$
+    \item \quad $x \gets x \times x$
+    \item Return $r$
+\end{itemize}
+}
+\end{ealgorithm}

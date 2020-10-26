@@ -1,0 +1,95 @@
+\chapter{Introduction}
+\label{chap-introduction}
+
+\section{Zero-knowledge Proof and Related Works}
+
+A \textit{proof} is a piece of information that attests to the validity of a statement. First, we would like to narrow down the meaning of \textit{proof} being used in \textit{zero-knowledge proof} and \textit{proof of knowledge}, and provide some insights about these protocols.
+
+We start with Zero-knowledge Proof. Here, we are concerned about \textit{proving membership of NP languages}, for example, prove that a (publicly known) graph G is a Hamiltonian graph.
+Step by step, \textit{zero-knowledge} property of a proof can be conceptualized as: \cite{goldreich2007foundations}
+\begin{enumerate}
+    \item A person who reads the proof (the \textit{verifier}) \textit{gains no knowledge} after reading it.
+    \item Gaining knowledge is then defined as: the \textit{computational capability} of the verifier does not increase after reading the proof.
+    \item If after reading a proof, the verifier could compute what he could not have \textit{efficiently} computed earlier, then we say the \textit{computational capability} of the verifier has increased, and therefore the proof is \textit{not} zero-knowledge.
+\end{enumerate}
+
+Back to our earlier example, if a prover proves that G is a Hamiltonian graph by revealing its Hamiltonian cycle, then the verifier will know the Hamiltonian cycle of G, which cannot be computed efficiently, therefore this proof is \textit{not} Zero-knowledge.
+
+\textbf{Remark:} When we use \textit{efficient}, we mean \textit{polynomial-time}.
+
+Before going to proof of knowledge, we recall an informal definition of NP languages and NP relations. An NP language $L$ is defined as
+$$L = \{x: \exists w, |w| \in \mathrm{poly}(|x|), \mathcal{A}(x, w) = 0\}$$
+for some deterministic polynomial-time algorithm $\mathcal{A}$. The corresponding relation of $L$ is
+$$\mathcal{R}_L = \{ \langle x, w \rangle : \mathcal{A}(x, w) = 0\}$$
+$x$ is called \textit{instance} and $w$ is a \textit{witness} for $x$.
+
+A \textit{proof of knowledge} attests that the prover \textit{knows} a witness $w$ for some instance $x$. Proof of knowledge becomes useful when L is the universal set, meaning that every instance is in $L$ and has a witness. Consider, for example, the discrete logarithm problem $\mathcal{R} = \{ \langle x, w \rangle : g^w = x\}$ for a multiplicative group $\G$ and a generator $g$ of $\G$; here, every $x \in \G$ has a discrete logarithm base $g$, therefore, it is not enough to use zero-knowledge proof, we also need a proof of knowledge.
+
+In 1985, Goldwasser, Micali and Rackoff published a paper that marked the beginning of zero-knowledge proof researches \cite{goldwasser1985knowledge}. In this paper, the authors proposed a \textit{zero-knowledge interactive proof} system for languages of Quadratic Residue and Quadratic Nonresidue, i.e. proving that $y$ has (or does not have) a square root modulo $x$. They did this by using an interactive process between the prover and the verifier, where the verifier sends random challenges to the prover.
+
+In 1986, Oded Goldreich et al. proved that all NP languages have zero-knowledge proof system, under the assumption that one-way permutation exists, by constructing a zero-knowledge proof for Graph 3-Coloring problem \cite{goldreich1986prove}. This opens a possibility for a \textit{general purpose} proof system to prove all NP relations in zero-knowledge. However, this result is far from practical, because it is not clear nor intuitive how to transform another NP statement to a graph coloring problem. Recent developments use \textit{arithmetic circuit} to express the statement being proved, which makes it easier to write the statement.
+
+SNARKs are general-purpose proof systems that pursuit the following efficiency characteristics:
+\begin{itemize}
+    \item \textit{Succinctness}: Proof size is sub-linear to the size of the instance.
+    \item \textit{Non-interactivity}: The protocol is 1-round, their is no interaction between the prover and verifiers.
+    \item \textit{Verifier performance}: Time-complexity of the verifier is \textit{sub-linear} to the size of its input.
+    \item \textit{Prover performance}: Time-complexity of the prover is \textit{linear} or \textit{quasi-linear} to the size of its input.
+\end{itemize}
+
+Several SNARKs constructions have been proposed under different \textit{trust models} in the \textit{key generation} step:
+\begin{itemize}
+    \item \textit{Trusted setup}: The party who generates the key has \textit{toxic wastes} that can compromise the security of the system. In practice, the trusted setup is performed using a \textit{multi-party computation} protocol, such that trust in at least one party is sufficient.
+    \item \textit{Transparent setup}: We do not need to trust the party who generate the key.
+\end{itemize}
+
+A class of efficient proof systems is \textit{pairing-based} SNARKs, which requires a trusted setup. One such system is Groth16 \cite{groth2016size}, which requires trusted-setup \textit{for each circuit}, has constant proof size of 3 group elements, and proof verification consists of computing 3 pairings. Another class of pairing-based SNARKs are \textit{universal} SNARKs, starting with Sonic \cite{maller2019sonic} and improved in PLONK \cite{gabizon2019plonk} and Marlin \cite{chiesa2020marlin}. Universal SNARKs require a one-time trusted setup to prove all statements up to a certain bound.
+
+Transparent proof systems usually comes with compromises on verifier performance and proof size, two examples are zk-STARKs \cite{ben2019scalable} and Bulletproof \cite{bunz2018bulletproofs}. zk-STARKs has proof size $O(\log^2 T)$, for circuit with 1-million gates, STARK produces a proof with size 600Kb, whereas Groth16 produces proofs with constant-size 200 bytes \cite{bunz2020transparent}. On the other hand, Bulletproof is transparent and has constant-size proofs, however Bulletproof has \textit{linear} verifier time-complexity.
+
+The main study subject of this thesis, Supersonic, is a transparent SNARKs with $O(\log d)$ proof size, $O(\log d)$ verifier time-complexity, and $O(d \log d)$ prover time-complexity.
+
+
+
+\section{Organization}
+
+We briefly walk through the contents of each chapter: 
+
+\begin{itemize}
+    \item Chapter \ref{chap-background}: \textbf{Background}.
+    \begin{itemize}
+        \item Basic Abstract Algebra and Computational Complexity theory.
+        \item Cryptographic primitives: falsifiable assumptions and commitment schemes.
+        \item Defining zero-knowledge proof and proof of knowledge.
+    \end{itemize}
+    \item Chapter \ref{chap-sonic}: \textbf{Sonic Polynomial Interactive Oracle Proof}.
+    \begin{itemize}
+        \item Sonic constraints system.
+        \item Reconstructing Sonic.
+        \item Modifications to Sonic.
+    \end{itemize}
+    \item Chapter \ref{chap-dark}: \textbf{DARK Polynomial Commitment}.
+    \begin{itemize}
+        \item Building blocks: homomorphic integer commitments and encoding polynomials as integers.
+        \item Commitment scheme for polynomials.
+        \item Polynomial evaluation protocol.
+        \item Various optimizations to the protocol.
+    \end{itemize}
+    \item Chapter \ref{chap-circuit}: \textbf{Arithmetic circuits}.
+    \begin{itemize}
+        \item Definition of circuits and how to compose circuits.
+        \item Transforming Boolean circuits to circuits on Finite Field.
+        \item How to use arithmetic circuits in Sonic.
+        \item Description of SHA-256 and exponentiation-by-squaring circuit.
+    \end{itemize}
+    \item Chapter \ref{chap-implement}: \textbf{Implementation and Experimentation}.
+    \begin{itemize}
+        \item Various techniques used in Supersonic implementation.
+        \item Source code details.
+        \item Experimentation results.
+    \end{itemize}
+    \item Chapter \ref{chap-conclusion}: \textbf{Conclusion}.
+    \begin{itemize}
+        \item Summary, open problems, and future works.
+    \end{itemize}
+\end{itemize}

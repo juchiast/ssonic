@@ -1,0 +1,243 @@
+\chapter{Sonic Polynomial Interactive Oracle Proof}
+\label{chap-sonic}
+
+\section{Sonic Constraints System}
+
+This section describes the constraints system (a system of equations) used by Sonic \cite{maller2019sonic}, which we called \textit{Sonic Constraints System}. The constraints system operates on a finite field $\mathrm{GF}(p)$ for a large prime $p$, which we denote $\F$ omitting the order $p$. We define this constraints system as an NP relation.
+
+\begin{definition}[Sonic Constraints System]
+Given a finite field with prime order $\F$, two integers $n > 0$ and $Q \ge 0$, the Sonic Constraints System is defined by the relation $\RSonic$,
+\[
+\RSonic(\F, n, Q) = \left\{
+\langle
+    \{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q},
+    (\Vec{a}, \Vec{b}, \Vec{c})
+\rangle
+:
+\begin{array}{l}
+    \forall i \in [n], \forall q \in [Q] \\
+    \Vec{a}, \Vec{b}, \Vec{c} \in \F^n \\
+    \Vec{u}_q, \Vec{v}_q, \Vec{w}_q \in \F^n \\
+    a_i b_i = c_i \\
+    \langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle
+      = k_q
+\end{array}
+\right\}
+\]
+\end{definition}
+
+For simplicity, sometime we omit $(\F, n, Q)$ and only write $\RSonic$. The witness of this relation is three vectors $\Vec{a}, \Vec{b}, \Vec{c} \in \F^n$, the instance is the set of $Q$ constraints $\{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$. We will later show how to convert an Arithmetic Circuit Satisfiability problem into this form of constraints, and also that we can convert from a Boolean Circuit to an Arithmetic Circuit  over a finite field $\mathrm{GF}(p)$, therefore, all NP statements can be transformed into the Sonic Constraints System.
+
+It is worth knowing that, for a circuit satisfiability problem $\mathrm{C}(x, w) = 0$, the structure of $\mathrm{C}$ is captured by $\{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q \}$; $\{ k_q \}$ captures $x$ and constant values used in $\mathrm{C}$; $(\Vec{a}, \Vec{b}, \Vec{c})$ contains all wire's values of $\mathrm{C}$, and thus contains $w$.
+
+We remarks that after conversion from Arithmetic Circuit Satisfiability, most scalar values in vectors $\Vec{u}_q, \Vec{v}_q, \Vec{w}_q$ are zero. In fact, each equation $\langle \Vec{a}, \Vec{u}_q \rangle + \langle \Vec{b}, \Vec{v}_q \rangle + \langle \Vec{c}, \Vec{w}_q \rangle = k_q$ can be written as $a_i u_i + b_j  v_j + c_k w_k = k_q$ for some $i, j, k \in [n]$ and $u_i, v_j, w_k \in \{-1, 0, 1\}$. Thus, we are actually using a very small subset of $\RSonic$, it might be possible to design a proof system for this subset and achieve better efficiency.
+Nevertheless, the next section describe how to convert $\RSonic$ into probabilistic testing of a univariate polynomial.
+
+\section{Sonic Constraint System to Polynomial Testing}
+
+\begin{lemma}[Schwartz-Zippel lemma]
+Let $\F$ be a finite field, let $f(X) \in \F[X]$ be a degree-$d$ polynomial on $\F$. Let $x$ is sampled uniformly random from $\F$, if $f(X) \ne 0$ then
+$$\pr{f(x) = 0} \le \frac{d}{|\F|}$$
+\end{lemma}
+
+We want to transform $x = \{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$ and $w = (\Vec{a}, \Vec{b}, \Vec{c})$ into $f(Y)$ such that for all $x, w$, $(x, w) \in \RSonic \iff f(Y) = 0$ (we recall that writing $f(Y) = 0$ means $f(Y)$ is the zero polynomial).
+
+Following the methodology in \cite{maller2019sonic}, we embed each equation into a coefficient of $f(Y)$:
+\begin{itemize}
+    \item For all $i \in [n]$, $a_i b_i = c_i$ becomes $(a_i b_i - c_i) Y^i = 0$ and $(a_i b_i - c_i) Y^{-i} = 0$, the second equation is redundant, it was added to support the transformation in the next section.
+    \item For all $q \in [Q]$, $\langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle
+      = k_q$ becomes $$(\langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle
+      - k_q) Y^{n + q} = 0$$
+\end{itemize}
+
+Summing up the left-hand sides of the above equations, we have
+\begin{align*}
+f(Y) = & \sum_{i=1}^{n}(a_i b_i - c_i) Y^{-i} \\
+& + \sum_{i=1}^{n}(a_i b_i - c_i) Y^i \\
+& + \sum_{q=1}^{Q} (\langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle
+      - k_q) Y^{n + q}
+\end{align*}
+
+With the above definition of $f(Y)$, we have $\forall x, y, (x, w) \in \RSonic \iff f(Y) = 0$, assuming a large enough field $\F$.
+
+Having $f(Y)$ defined, we can use probabilistic testing of polynomials via the Schwartz-Zippel lemma. The Verifier chooses a random point $z \in \F$, queries for $f(z)$, and accepts if $f(z) = 0$, this protocol has soundness error $\mathrm{deg}(f(Y)) / |\F|$ according to the Schwartz-Zippel lemma. The main result of this section is summarized in claim \ref{sonic-univariate-test}.
+
+\begin{claim}
+\label{sonic-univariate-test}
+Given a relation $\RSonic(\F, n, Q)$ for a large field $\F$. \\
+Let $x = \{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$, $w = (\Vec{a}, \Vec{b}, \Vec{c})$. Let $f(Y)$ be defined by
+\begin{align*}
+f(Y) = & \sum_{i=1}^{n}(a_i b_i - c_i) Y^{-i} \\
+& + \sum_{i=1}^{n}(a_i b_i - c_i) Y^i \\
+& + \sum_{q=1}^{Q} (\langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle
+      - k_q) Y^{n + q}
+\end{align*}
+We have that $\forall (x, w) \in \RSonic, f(Y) = 0$. \\
+Let $z$ be chosen uniformly random from $\F$, then by the Schwartz-Zippel lemma we have
+$$\pr{f(z) = 0 \mid (x, w) \not\in \RSonic } \le \frac{2n+Q}{|\F|}$$
+\end{claim}
+
+However, we cannot use $f(Y)$ directly in a Polynomial IOP. Although the Verifier can query the proof oracle $f(Y)$ sent by the Prover, he cannot check that $f(Y)$ is well-formed, in another word, he cannot form a relationship between the proof oracle $f(Y)$ and the instance $x = \{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$ being proved. To resolve this issue, we could try to split $f(Y)$ into two polynomials $f_1(Y)$ and $f_2(Y)$, such that $f_1(Y)$ contains the witness and $f_2(Y)$ contains the instance of the relation. For example, suppose $f(Y)$ can be factored as $f(Y) = f_1(Y) f_2(Y)$, then the Verifier can query for $f_1(z)$ and compute $f_2(z)$, then the check $f(z) = f_1(z) f_2(z)$ fail with overwhelming probability if $f(Y) \ne f_1(Y) f_2(Y)$. In fact, \cite{maller2019sonic} defines $R(X, Y)$, $S(X, Y)$ and $k(y)$ such that:
+\begin{itemize}
+    \item $R(X, Y)$ contains $(\Vec{a}, \Vec{b}, \Vec{c})$.
+    \item $S(X, Y)$ contains $\{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q \}$.
+    \item $k(Y)$ contains $\{ k_q \}$.
+    \item The coefficient of $X^0$ of $R(X, 1) [R(X, Y) + S(X, Y)] - k(Y)$ is $f(Y)$.
+\end{itemize}
+
+The next section will explain how the Sonic paper \cite{maller2019sonic} transforms from $f(X)$ to $R(X, Y)$, $S(X, Y)$, and $k(Y)$.
+
+\section{Splitting Witness and Instance from Polynomial Testing}
+
+We reconstruct $t(X, Y)$ as in \cite{maller2019sonic}, the result of this section is summarized in claim \ref{sonic-rs}.
+
+\begin{claim}
+\label{sonic-rs}
+Let $f(Y)$ be defined as in claim \ref{sonic-univariate-test}.
+We define $R(X, Y)$, $S_1(X, Y)$, $S_2(X, Y)$, and $k(Y)$ as follow:
+\begin{align*}
+R(X, Y) &= \sum_{i=1}^n \left(a_i X^{-i} Y^{-i} + b_i X^{i} Y^{i} + c_i X^{-i-n} Y^{-i-n}\right) \\
+k(Y) &= \sum_{q=1}^{Q} k_q Y^{n + q} \\
+S_1(X, Y) &= \sum_{i=1}^{n} (Y^{i} + Y^{-i}) X^{n+i} \\
+S_2(X, Y) &= \sum_{i=1}^{n} \left( u_i(Y)X^i + v_i(Y)X^{-i} + w_i(Y)X^{n+i}\right) \\
+S(X, Y) &= S_1(X, Y) + S_2(X, Y)
+\end{align*}
+where, for $i \in [n]$,
+\begin{align*}
+u_i(Y) & = \sum_{q=1}^Q u_{q, i} Y^{q+n} \\
+v_i(Y) & = \sum_{q=1}^Q v_{q, i} Y^{q+n} \\
+w_i(Y) & = \sum_{q=1}^Q w_{q, i} Y^{q+n}    
+\end{align*}
+
+Finally, let $t(X, Y) = R(X, 1) \times \left[ R(X, Y) + S(X, Y) \right] - k(Y)$, we have that $f(Y)$ is the coefficient $X^0$ of $t(X, Y)$.
+\end{claim}
+
+Maller et al. \cite{maller2019sonic} uses a technique from Bootle et al. \cite{bootle2016efficient} to embed $f(Y)$ into the coefficient of $X^0$ of $t(X, Y)$, we summarize their technique here:
+\begin{itemize}
+    \item Let $f_a(X) = \sum_{i} a_i X^{i}$, $f_b(X) = \sum_{i} b_i X^{i}$ be polynomials that can contain negative exponents, the coefficient of $X^0$ of $f_a(X) f_b(X)$ is $\sum_{i} a_i b_{-i}$.
+    \item Thus, one could compute the inner product of $\Vec{a}$ and $\Vec{b}$ by placing them in opposite sides of two polynomials and then multiply the two polynomials.
+\end{itemize}
+
+We need to re-write $f(Y)$ in claim \ref{sonic-univariate-test} as a sum of inner products. We have:
+\begin{align*}
+f(Y) = &
+ \sum_{i=1}^{n} a_i \times b_i Y^i + \sum_{i=1}^{n} b_i \times a_i Y^{-i} \\
+& + \sum_{i=1}^{n}c_i (-Y^i -Y^{-i}) \\
+& + \sum_{q=1}^{Q} (\langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle
+      - k_q) Y^{n + q} \\
+= & f_1(Y) + f_2(Y) + f_3(Y) - k(Y)
+\end{align*}
+
+where
+\begin{align*}
+f_1(Y) & = \sum_{i=1}^{n} a_i \times b_i Y^i + \sum_{i=1}^{n} b_i \times a_i Y^{-i} \\
+f_2(Y) & = \sum_{i=1}^{n}c_i (-Y^i -Y^{-i}) \\
+f_3(Y) & = \sum_{q=1}^{Q} (\langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle) Y^{n + q} \\
+k(Y) & = \sum_{q=1}^{Q} k_q Y^{n + q}
+\end{align*}
+
+We examine $f_1(Y)$, if we define $R(X, Y)$ as $R(X, Y) = \sum_{i=1}^n a_i Y^{-i} X^{-i} + \sum_{i=1}^n b_i Y^i X^{i}$, then the coefficient of $X^0$ of $R(X, 1) \times R(X, Y)$ is $f_1(Y)$.
+
+Adding $f_2(Y)$ can be done by allocating $c_1,\dots,c_n$ in $X^{-n-1},\dots,X^{-n-n}$ of $R(X, Y)$, and introduce $S_1(X, Y) = \sum_{i=1}^{n} (Y^{i} + Y^{-i}) X^{n+i}$. However, we allocate $c_i Y^{-n-i}$ instead, then $R(X, Y) = \sum_{i=1}^n (a_i X^{-i} Y^{-i} + b_i X^{i} Y^{i} + c_i X^{-n-i} Y^{-n-i})$ has a nice property: we can evaluate a bivariate polynomial $R(X, Y)$ by evaluating a univariate polynomial $R(X, 1)$.
+
+At this point, we have that $f_1(Y) + f_2(Y)$ is the coefficient of $X^0$ of $R(X, 1) R(X, Y) + R(X, 1) S_1(X, Y)$. We now examine $f_3(Y)$.
+\begin{align*}
+f_3(Y) & = \sum_{q=1}^{Q} (\langle \Vec{a}, \Vec{u}_q \rangle
+      + \langle \Vec{b}, \Vec{v}_q \rangle
+      + \langle \Vec{c}, \Vec{w}_q \rangle) Y^{n + q}
+\end{align*}
+
+Taking a look the inner product $\langle \Vec{a}, \Vec{u}_q \rangle$, we have
+\begin{align*}
+\sum_{q=1}^{Q} \langle \Vec{a}, \Vec{u}_q \rangle Y^{n + q}
+& = \sum_{q=1}^{Q} \sum_{i=1}^{n} a_i \times u_{q, i} Y^{n + q} \\
+& = \sum_{i=1}^{n} \left( a_i \times \sum_{q=1}^Q u_{q, i} Y^{q+n}\right) \\
+& = \langle \Vec{a}, \Vec{u}(Y) \rangle
+\end{align*}
+
+where $\Vec{u}(Y)$ is a vector of $n$ polynomial $u_i(Y) = \sum_{q=1}^Q u_{q, i} Y^{q+n}$ for $i \in [n]$. Similarly, we define $\Vec{v}(Y)$ and $\Vec{w}(Y)$, for all $i \in [n]$
+\begin{align*}
+v_i(Y) & = \sum_{q=1}^Q v_{q, i} Y^{q+n} \\
+w_i(Y) & = \sum_{q=1}^Q w_{q, i} Y^{q+n}    
+\end{align*}
+
+Recalling that $R(X, Y) = \sum_{i=1}^n \left(a_i X^{-i} Y^{-i} + b_i X^{i} Y^{i} + c_i X^{-n-i} Y^{-n-i}\right)$, we allocate
+\begin{itemize}
+    \item $u_1(Y),\dots,u_n(Y)$ in coefficients of $X^1,\dots,X^n$.
+    \item $v_1(Y),\dots,v_n(Y)$ in coefficients of $X^{-1},\dots,X^{-n}$.
+    \item $w_1(Y),\dots,w_n(Y)$ in coefficients of $X^{n+i},\dots,X^{n+i}$.
+\end{itemize}
+
+Finally, we have $S_2(X, Y)$ such that $f_3(Y)$ is the coefficient of $X^0$ of $R(X, 1) S_2(X, Y)$:
+$$S_2(X, Y) = \sum_{i=1}^{n} \left( u_i(Y)X^i + v_i(Y)X^{-i} + w_i(Y)X^{n+i} \right)$$
+
+We arrive at the result of Sonic \cite{maller2019sonic}, let
+$$t(X, Y) = R(X, 1) \times \left[ R(X, Y) + S_1(X, Y) + S_2(X, Y) \right] - k(Y)$$
+then $f(Y)$ if the coefficient of $X^0$ of $t(X, Y)$. Therefore, we reduced the problem probabilistic testing of $f(Y)$ to a coefficient query of $t(X, Y)$.
+
+\section{Sonic Polynomial IOP}
+
+With $R(X, Y)$ as witness and $S_1(X, Y)$, $S_2(X, Y)$, and $k(y)$ as instance, we need to prove that for a random challenge $y \in \F$, $t(X, y)$ has no constant term.
+
+The idea of the protocol is summarized bellow:
+\begin{enumerate}
+    \item $\mathcal{P}$ sends proof oracle $R(X, 1)$.
+    \item $\mathcal{V}$ samples a uniform random $y \in \F$.
+    \item $\mathcal{P}$ sends proof oracle $t(X, y)$.
+    \item $\mathcal{V}$ samples uniform random $z \in \F$, and queries for $R(z, 1)$, $R(zy, 1)$, $t(z, y)$. $\mathcal{V}$ checks that $t(z, y) = r(z,1) \times \left[ r(zy, 1) + S_1(z, y) + S_2(z, y)\right] - k(y)$
+    \item $\mathcal{P}$ and $\mathcal{V}$ engages in a coefficient query protocol to prove that coefficient of $X^0$ of $t(X, y)$ is 0.
+\end{enumerate}
+
+This abstract oracle protocol will be compiled into an actual protocol using the DARK Commitment Scheme. However, we need some adjustments to be compatible with DARK \cite{bunz2020transparent}. DARK does not consider polynomials with negative exponents, therefore we want the proof oracles $R(X, 1)$ and $t(X, y)$ to have non-negative exponents.
+
+Observing that the smallest exponent of $X$ of $R(X, Y)$ is $X^{-2n}$, we shift the degree of $X$ by $2n$:
+\begin{align*}
+R'(X, Y)
+&= X^{2n} R(X, Y) \\
+&= \sum_{i=1}^n \left( a_i Y^{-i} X^{-i + 2n} + b_i Y^{i} X^{i + 2n} + c_i Y^{-i-n} X^{-i+n}  \right)
+\end{align*}
+
+In the first step, $\mathcal{P}$ sends proof oracle $R'(X, 1)$ (instead of $R(X, 1)$).
+
+We analyze $t(X, Y)$, recall that
+$$t(X, Y) = R(X, 1) \times \left[ R(X, Y) + S(X, Y) \right] - k(Y)$$
+Smallest exponent in $R(X, Y)$ is $X^{-2n}$ and $S(X, Y)$'s smallest is $X^{-n}$, therefore, smallest exponent of $X$ of $t(X, Y)$ is $X^{-4n}$, we shift $t(X, Y)$ by $X^{4n}$.
+\begin{align*}
+t'(X, Y)
+&= X^{4n} t(X, Y) \\
+&= X^{2n} R(X, 1) \left[ X^{2n} R(X, Y) + X^{2n} S(X, Y) \right] - X^{4n} k(Y) \\
+&= R'(X, 1) \left[ R'(X, Y) + X^{2n} S(X, Y) \right] - X^{4n} k(Y)
+\end{align*}
+
+$\mathcal{P}$ will send $t'(X, y)$ instead of $t(X, y)$, $\mathcal{P}$ and $\mathcal{V}$ use coefficient query to prove that coefficient of $X^{4n}$ is 0. We conclude this section with the updated Sonic Polynomial IOP for $\RSonic$ in  protocol \ref{sonic-iop}.
+
+\begin{protocol}[Sonic Polynomial IOP]
+\label{sonic-iop}
+\quad
+
+\textup{Witness: $\Vec{a}, \Vec{b}, \Vec{c}$ \\
+Instance: $\{ \Vec{u}_q, \Vec{v}_q, \Vec{w}_q, k_q \}_{q=1}^{Q}$ \\
+Before entering the protocol, $\mathcal{P}$ computes $R'(X, Y)$ and $t'(X, Y)$, $\mathcal{P}$ and $\mathcal{V}$ compute $S(X, Y)$ and $k(Y)$.
+\begin{enumerate}
+    \item $\mathcal{P}$ sends proof oracle $R'(X, 1)$.
+    \item $\mathcal{V}$ samples a uniform random $y \in \F$.
+    \item $\mathcal{P}$ splits $t'(X, Y)$ at the term $X^{4n}$ into $t'_{L}(X, y)$ and $t'_{H}(X, y)$ such that $t'(X, y) = t'_L(x, y) + \alpha X^{4n} + X^{4n+1} t'_H(X, y)$. $\mathcal{P}$ sends proof oracle $t'(X, y)$, $t'_L(X, y)$, and $t'_H(X, y)$.
+    \item $\mathcal{V}$ samples uniform random $z \in \F$, and queries for $R'(z, 1)$, $R'(zy, 1)$, $t'(z, y)$, $t'_L(z, y)$, $t'_H(z, y)$. $\mathcal{V}$ checks that $t(z, y) = r(z,1) \times \left[ r(zy, 1) + z^{2n} S(z, y)\right] - z^{4n}k(y)$ and $t'(z, y) = t'_L(z, y) + z^{4n+1} t'_H(z, y)$.
+    \item $\mathcal{V}$ outputs 1 if all checks pass, otherwise outputs 0.
+\end{enumerate}
+}
+\end{protocol}
