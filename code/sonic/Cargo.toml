@@ -21,11 +21,6 @@ average = "0.10"
 log = "0.4"
 env_logger = "0.7"
 
-[profile.release]
-opt-level = 3
-lto = true
-debug = 1
-
 [features]
 defaults = []
 no-assert = ["poly-commit/no-assert"]

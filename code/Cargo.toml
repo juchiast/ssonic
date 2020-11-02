@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "commit",
+    "sonic",
+]
+
+[profile.release]
+opt-level = 3
+lto = true
+debug = 1

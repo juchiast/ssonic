@@ -1,7 +1,7 @@
 use crate::Int;
+use digest::Digest;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use sha2::Digest;
 use std::collections::VecDeque;
 
 pub mod gen_prime;
@@ -34,7 +34,7 @@ impl FeedHasher for crate::RSAGroup {
 impl FeedHasher for usize {
     fn feed_hasher(&self, hasher: &mut Hasher, _buffer: &mut Vec<u8>) {
         let x = *self as u64;
-        hasher.input(&x.to_le_bytes());
+        hasher.update(&x.to_le_bytes());
     }
 }
 
@@ -50,7 +50,7 @@ impl FeedHasher for Int {
     fn feed_hasher(&self, hasher: &mut Hasher, buffer: &mut Vec<u8>) {
         buffer.resize(self.significant_digits::<u8>(), 0);
         self.write_digits(buffer.as_mut_slice(), rug::integer::Order::LsfLe);
-        hasher.input(buffer);
+        hasher.update(buffer);
     }
 }
 
@@ -90,7 +90,7 @@ impl ProverMessage for Vec<Int> {
 
 impl FeedHasher for str {
     fn feed_hasher(&self, hasher: &mut Hasher, _buffer: &mut Vec<u8>) {
-        hasher.input(self.as_bytes())
+        hasher.update(self.as_bytes());
     }
 }
 
@@ -118,7 +118,7 @@ impl FiatShamirRng {
         let mut hasher = Hasher::new();
         let mut buffer = Vec::new();
         seed.feed_hasher(&mut hasher, &mut buffer);
-        let hash = hasher.result();
+        let hash = hasher.finalize();
         let mut seed = [0u8; 32];
         seed.copy_from_slice(&hash);
         let rng = ChaCha20Rng::from_seed(seed);
@@ -134,10 +134,10 @@ impl FiatShamirRng {
 
     pub fn prover_send<M: ProverMessage>(&mut self, msg: &M) {
         let mut hasher = Hasher::new();
-        hasher.input(&self.seed);
+        hasher.update(&self.seed);
         msg.feed_hasher(&mut hasher, &mut self.buffer);
         self.proofs.push_back(msg.to_proof_element());
-        let hash = hasher.result();
+        let hash = hasher.finalize();
         self.seed.copy_from_slice(&hash);
         self.rng = ChaCha20Rng::from_seed(self.seed);
     }
