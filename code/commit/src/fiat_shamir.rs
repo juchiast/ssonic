@@ -259,19 +259,8 @@ where
 
 #[macro_export]
 macro_rules! prover {
-    ($prover:ident, ($name:pat) => $code:block) => {{
-        match $prover {
-            $crate::fiat_shamir::Prover::Witness($name) => {
-                let (r, w) = $code;
-                (r, $crate::Prover::Witness(w))
-            },
-            $crate::fiat_shamir::Prover::Proof(p) => {
-                let (r, p) = $crate::fiat_shamir::ExtractProof::extract_prover_messages(p)?;
-                (r, $crate::Prover::Proof(p))
-            },
-        }
-    }};
     ($prover:ident, ( $( $name:pat),* ) => $code:block) => {{
+        #[allow(unused_parens)]
         match $prover {
             $crate::Prover::Witness(($($name),*)) => {
                 let (r, w) = $code;
