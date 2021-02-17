@@ -48,9 +48,26 @@ impl FeedHasher for Vec<Int> {
 
 impl FeedHasher for Int {
     fn feed_hasher(&self, hasher: &mut Hasher, buffer: &mut Vec<u8>) {
-        buffer.resize(self.significant_digits::<u8>(), 0);
+        let size = self.significant_digits::<u8>();
+        size.feed_hasher(hasher, buffer);
+        buffer.resize(size, 0);
         self.write_digits(buffer.as_mut_slice(), rug::integer::Order::LsfLe);
         hasher.update(buffer);
+    }
+}
+
+impl FeedHasher for str {
+    fn feed_hasher(&self, hasher: &mut Hasher, _buffer: &mut Vec<u8>) {
+        hasher.update(self.as_bytes());
+    }
+}
+
+impl<'a> FeedHasher for [&'a dyn FeedHasher] {
+    fn feed_hasher(&self, hasher: &mut Hasher, buffer: &mut Vec<u8>) {
+        self.len().feed_hasher(hasher, buffer);
+        for i in self {
+            i.feed_hasher(hasher, buffer);
+        }
     }
 }
 
@@ -84,20 +101,6 @@ impl ProverMessage for Vec<Int> {
         match p {
             ProofElement::Numbers(v) => Some(v),
             _ => None,
-        }
-    }
-}
-
-impl FeedHasher for str {
-    fn feed_hasher(&self, hasher: &mut Hasher, _buffer: &mut Vec<u8>) {
-        hasher.update(self.as_bytes());
-    }
-}
-
-impl<'a> FeedHasher for [&'a dyn FeedHasher] {
-    fn feed_hasher(&self, hasher: &mut Hasher, buffer: &mut Vec<u8>) {
-        for i in self {
-            i.feed_hasher(hasher, buffer);
         }
     }
 }
