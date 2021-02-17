@@ -236,7 +236,6 @@ mod tests {
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rug::ops::Pow;
-    use std::{assert, assert_eq};
 
     fn init_randomness() -> (ChaCha20Rng, UniformRandom) {
         let mut seed = [8u8; 32];

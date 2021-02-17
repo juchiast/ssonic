@@ -32,7 +32,7 @@ mod tests {
     use super::*;
     use poly_commit::{Int, PierreGenPrime};
     use rand::Rng;
-    use std::{assert, assert_eq};
+
     #[test]
     fn test_exp() {
         let mut rng = rand::thread_rng();

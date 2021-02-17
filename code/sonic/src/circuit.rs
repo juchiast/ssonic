@@ -1,7 +1,6 @@
 use crate::uint32;
 use poly_commit::Int;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 pub enum VertexType {

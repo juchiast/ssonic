@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
-use poly_commit::{assert, assert_eq};
 
 pub enum VertexType {
     Input(usize),
@@ -331,7 +330,6 @@ mod tests {
     use super::*;
     use sha2::digest::Digest;
     use std::convert::TryInto;
-    use std::{assert, assert_eq};
 
     #[test]
     fn test_sha256() {

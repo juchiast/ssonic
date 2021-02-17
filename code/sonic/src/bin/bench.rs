@@ -2,8 +2,6 @@ use poly_commit::*;
 use rand::Rng;
 use std::collections::VecDeque;
 use std::time::Instant;
-use std::{assert, assert_eq};
-use supersonic::sonic;
 use supersonic::sonic::*;
 
 fn setup_sonic(max_deg: usize) -> Sonic {
@@ -61,8 +59,10 @@ fn bench_sonic_powmod() {
                 .collect::<Vec<_>>();
             let output = supersonic::circuit::evaluate(&circuit, &input, &p);
 
-            assert_eq!(&output[1], &g);
-            assert!((g.clone().pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p));
+            std::assert_eq!(&output[1], &g);
+            std::assert!(
+                (g.clone().pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p)
+            );
 
             let linear_circuit = supersonic::linear_circuit::convert(circuit);
             let left_input = input;

@@ -27,26 +27,30 @@ pub mod traits {
     pub use crate::group::Group;
 }
 
-#[cfg(feature = "no-assert")]
 #[macro_export]
 macro_rules! assert {
-    ($ ($ arg : tt) *) => {};
+    ($ ($ arg : tt) *) => {
+        if !cfg!(feature = "no-assert") || cfg!(test) {
+            std::assert!($( $arg ) *);
+        }
+    };
 }
 
-#[cfg(not(feature = "no-assert"))]
-#[macro_export]
-macro_rules! assert {
-    ($ ($ arg : tt) *) => { std::assert!($( $arg ) *); };
-}
-
-#[cfg(feature = "no-assert")]
 #[macro_export]
 macro_rules! assert_eq {
-    ($ ($ arg : tt) *) => {};
+    ($ ($ arg : tt) *) => {
+        if !cfg!(feature = "no-assert") || cfg!(test) {
+            std::assert_eq!($( $arg ) *);
+        }
+    };
 }
 
-#[cfg(not(feature = "no-assert"))]
-#[macro_export]
-macro_rules! assert_eq {
-    ($ ($ arg : tt) *) => { std::assert_eq!($( $arg ) *); };
+#[cfg(test)]
+mod test {
+    #[cfg(feature = "no-assert")]
+    #[test]
+    #[should_panic]
+    fn test_no_assert() {
+        assert!(false);
+    }
 }

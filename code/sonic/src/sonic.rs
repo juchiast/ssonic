@@ -374,7 +374,6 @@ mod tests {
     use super::*;
     use poly_commit::*;
     use rand::Rng;
-    use std::{assert, assert_eq};
 
     #[test]
     fn test_tx_y_powmod() {
@@ -509,7 +508,6 @@ mod tests {
     #[ignore]
     fn test_sonic_powmod() {
         use poly_commit::{FiatShamirRng, UniformRandom};
-        use std::{assert, assert_eq};
         let mut sonic = setup_sonic(5500);
         let mut rng = rand::thread_rng();
         // g^x = y mod p

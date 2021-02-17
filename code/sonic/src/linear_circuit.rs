@@ -6,7 +6,6 @@ use poly_commit::Int;
 use poly_commit::{assert, assert_eq};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::num::NonZeroUsize;
 
 pub enum VertexType {
@@ -361,7 +360,6 @@ pub fn convert(vertices: Vec<crate::circuit::Vertex>) -> Circuit {
 mod tests {
     use super::*;
     use rand::Rng;
-    use std::{assert, assert_eq};
 
     #[test]
     fn test_convert() {

@@ -1,3 +1,4 @@
+use poly_commit::assert;
 use poly_commit::*;
 use rand::Rng;
 use std::time::Instant;
