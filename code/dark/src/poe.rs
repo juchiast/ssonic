@@ -1,10 +1,6 @@
 #![allow(non_snake_case)]
 /// Proof of Exponentation
-use crate::prover;
-use crate::traits::Group;
-use crate::FiatShamirRng;
-use crate::Int;
-use crate::Prover;
+use common::{prover, traits::Group, FiatShamirRng, Int, Prover};
 
 /// Statement: u^x = w
 pub fn proof_of_exponentation<G: Group, W>(

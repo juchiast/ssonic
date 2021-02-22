@@ -1,8 +1,9 @@
-use poly_commit::*;
+use common::*;
+use dark::DARK;
 use rand::Rng;
+use sonic::sonic::*;
 use std::collections::VecDeque;
 use std::time::Instant;
-use supersonic::sonic::*;
 
 fn setup_sonic(max_deg: usize) -> Sonic {
     let key_path = format!("keys/test_key_{}.json", max_deg);
@@ -53,18 +54,18 @@ fn bench_sonic_powmod() {
                 (temp, x_bits)
             };
 
-            let circuit = supersonic::modulo::exp(64);
+            let circuit = sonic::modulo::exp(64);
             let input = std::iter::once(g.clone())
                 .chain(x_bits.into_iter())
                 .collect::<Vec<_>>();
-            let output = supersonic::circuit::evaluate(&circuit, &input, &p);
+            let output = sonic::circuit::evaluate(&circuit, &input, &p);
 
             std::assert_eq!(&output[1], &g);
             std::assert!(
                 (g.clone().pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p)
             );
 
-            let linear_circuit = supersonic::linear_circuit::convert(circuit);
+            let linear_circuit = sonic::linear_circuit::convert(circuit);
             let left_input = input;
             let right_input = output;
 
@@ -91,7 +92,7 @@ fn bench_sonic_powmod() {
 
     println!(
         "Length: {} bytes",
-        poly_commit::fiat_shamir::proof_length(&proof.proof)
+        common::fiat_shamir::proof_length(&proof.proof)
     );
 
     let mut durations = Vec::new();
@@ -128,10 +129,10 @@ fn bench_s_sha256() {
         r
     };
 
-    let uint32_circuit = supersonic::uint32::sha256();
-    let circuit = supersonic::circuit::convert(uint32_circuit);
+    let uint32_circuit = sonic::uint32::sha256();
+    let circuit = sonic::circuit::convert(uint32_circuit);
 
-    let linear_circuit = supersonic::linear_circuit::convert(circuit);
+    let linear_circuit = sonic::linear_circuit::convert(circuit);
     let left_input = input;
 
     let uvwk = linear_circuit.to_constrains(&left_input, &p);

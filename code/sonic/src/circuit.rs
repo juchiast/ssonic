@@ -1,5 +1,5 @@
 use crate::uint32;
-use poly_commit::Int;
+use common::Int;
 use std::collections::HashMap;
 use std::rc::Rc;
 

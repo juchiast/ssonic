@@ -30,7 +30,7 @@ pub fn select(x: Vertex, y: Vertex, b: Vertex, one: Vertex) -> Vertex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use poly_commit::{Int, PierreGenPrime};
+    use common::{Int, PierreGenPrime};
     use rand::Rng;
 
     #[test]

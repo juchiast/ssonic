@@ -1,6 +1,6 @@
 //! Sparse univariate and bivariate polynomial
 
-use crate::*;
+use common::Int;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct SparsePolyZp {

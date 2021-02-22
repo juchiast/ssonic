@@ -1,9 +1,10 @@
 #[macro_use]
 extern crate log;
 
-use poly_commit::*;
+use common::*;
 use std::time::Instant;
-use supersonic::sonic::*;
+use sonic::sonic::*;
+use dark::DARK;
 
 fn setup_sonic(max_deg: usize) -> Sonic {
     trace!("Reading key");
@@ -59,12 +60,12 @@ fn main() {
         r
     };
 
-    let uint32_circuit = supersonic::uint32::sha256();
-    let circuit = supersonic::circuit::convert(uint32_circuit);
-    let output = supersonic::circuit::evaluate(&circuit, &input, &p);
+    let uint32_circuit = sonic::uint32::sha256();
+    let circuit = sonic::circuit::convert(uint32_circuit);
+    let output = sonic::circuit::evaluate(&circuit, &input, &p);
 
     let start = Instant::now();
-    let linear_circuit = supersonic::linear_circuit::convert(circuit);
+    let linear_circuit = sonic::linear_circuit::convert(circuit);
     let left_input = input;
     let right_input = output;
 

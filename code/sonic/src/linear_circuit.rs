@@ -1,11 +1,10 @@
 //! Abstract toposort-ed arithmetic circuit
 
 use crate::*;
-use poly_commit::rug::Assign;
-use poly_commit::Int;
-use poly_commit::{assert, assert_eq};
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use common::Int;
+use common::{assert, assert_eq};
+use rug::Assign;
+use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroUsize;
 
 pub enum VertexType {
@@ -359,6 +358,7 @@ pub fn convert(vertices: Vec<crate::circuit::Vertex>) -> Circuit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use common::{assert, assert_eq};
     use rand::Rng;
 
     #[test]

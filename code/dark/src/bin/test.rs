@@ -1,7 +1,10 @@
 #![allow(warnings)]
 
-use poly_commit::traits::*;
-use poly_commit::*;
+extern crate dark;
+
+use common::*;
+use common::traits::*;
+use common::*;
 use rug::ops::Pow;
 use std::time::Instant;
 

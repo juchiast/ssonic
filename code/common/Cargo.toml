@@ -1,5 +1,5 @@
 [package]
-name = "sonic"
+name = "common"
 version = "0.1.0"
 authors = ["Duy Do <juchiast@gmail.com>"]
 edition = "2018"
@@ -7,18 +7,25 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-common = {path = "../common" }
-dark = { path = "../dark" }
-
-rug = { version = "1.8", default-features = false, features=["integer", "serde"] }
-sha2 = "0.9"
 rand = "0.7"
+rand_chacha = "0.2"
+digest = "0.9"
+rug = { version = "1.8", default-features = false, features=["integer", "serde"] }
+blake3 = "0.3.7"
+
+openssl = "0.10"
+
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
-serde = { version = "1", features = ["derive"] }
+
+rayon = "1.3"
+num_cpus = "1.13"
+
 average = "0.10"
+
 log = "0.4"
 env_logger = "0.7"
 
 [features]
 defaults = []
-no-assert = ["common/no-assert"]
+no-assert = []

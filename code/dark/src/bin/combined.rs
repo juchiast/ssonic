@@ -1,5 +1,7 @@
-use poly_commit::dark::Instance;
-use poly_commit::*;
+extern crate dark;
+
+use common::*;
+use dark::{Instance, DARK};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::time::Instant;

@@ -1,7 +1,6 @@
 //! Most significant coefficients first
 
 use crate::Int;
-use crate::{assert, assert_eq};
 
 #[derive(Clone)]
 pub struct PolyZp {
@@ -229,10 +228,9 @@ impl PolyZ {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
-
     use super::*;
-    use crate::*;
+    use crate::UniformRandom;
+    use crate::{assert, assert_eq};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rug::ops::Pow;
@@ -281,20 +279,5 @@ mod tests {
                 assert_eq!((i, a), (i, b));
             }
         }
-    }
-
-    #[bench]
-    fn bench_q_d_div_l(b: &mut test::Bencher) {
-        const Q_BITS: u32 = 4120;
-        const L_BITS: u32 = 512;
-        let (mut rng, mut uniform) = init_randomness();
-
-        let d = 5000;
-        let mut q = Int::from(0);
-        let mut l = Int::from(0);
-
-        uniform.rand_size(Q_BITS, &mut rng, &mut q);
-        uniform.rand_size(L_BITS, &mut rng, &mut l);
-        b.iter(|| q_d_div_l(&q, d, &l));
     }
 }

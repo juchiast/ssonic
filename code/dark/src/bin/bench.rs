@@ -1,6 +1,9 @@
 #![allow(warnings)]
 
-use poly_commit::*;
+extern crate dark;
+
+use common::*;
+use dark::{Instance, DARK};
 use rand::Rng;
 use rand::SeedableRng;
 use rug::ops::Pow;
@@ -159,7 +162,7 @@ fn bench_verification() {
 
                 dark.multi_zk_eval(
                     Prover::Witness((p_z, r)),
-                    dark::Instance {
+                    Instance {
                         commitment: c.clone(),
                         bound: bound.clone(),
                         y: vec![y.clone()],
@@ -202,7 +205,7 @@ fn bench_verification() {
         let start = Instant::now();
         dark.multi_zk_eval(
             Prover::Proof(proof),
-            dark::Instance {
+            Instance {
                 commitment: commit.clone(),
                 bound: bound.clone(),
                 y: vec![y.clone()],

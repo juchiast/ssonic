@@ -1,6 +1,6 @@
-use crate::traits::*;
-use crate::*;
-use crate::{assert, assert_eq};
+use common::traits::*;
+use common::*;
+use common::{assert, assert_eq};
 use rand::{rngs::OsRng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
@@ -599,7 +599,6 @@ impl DARK<RSAGroup> {
             let prover = outer_prover.take().unwrap();
 
             let c = fiat.verifier_rand_signed(&self.bound_alpha);
-            // result = c * instance + result
 
             result.commitment = self.group.mul(
                 &result.commitment,

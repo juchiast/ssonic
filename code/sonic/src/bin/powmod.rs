@@ -1,8 +1,8 @@
-use poly_commit::assert;
-use poly_commit::*;
+use common::*;
+use dark::DARK;
 use rand::Rng;
 use std::time::Instant;
-use supersonic::sonic::*;
+use sonic::sonic::*;
 
 fn setup_sonic(max_deg: usize) -> Sonic {
     let key_path = format!("keys/test_key_{}.json", max_deg);
@@ -63,14 +63,14 @@ fn main() {
         x_bits
     };
 
-    let circuit = supersonic::modulo::exp(bit_size);
+    let circuit = sonic::modulo::exp(bit_size);
     let input = std::iter::once(g.clone())
         .chain(x_bits.into_iter())
         .collect::<Vec<_>>();
-    let output = supersonic::circuit::evaluate(&circuit, &input, &p);
+    let output = sonic::circuit::evaluate(&circuit, &input, &p);
 
     let start = Instant::now();
-    let linear_circuit = supersonic::linear_circuit::convert(circuit);
+    let linear_circuit = sonic::linear_circuit::convert(circuit);
     let left_input = input;
     let right_input = output;
 

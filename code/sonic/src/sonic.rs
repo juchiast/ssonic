@@ -1,7 +1,8 @@
-use crate::*;
-use poly_commit::rug::Assign;
-use poly_commit::{assert, assert_eq};
-use poly_commit::{dark, FiatShamirRng, PolyZ, PolyZp, Prover, RSAGroup, DARK};
+use crate::{SparseBiPolyZp, SparsePolyZp};
+use common::{assert, assert_eq};
+use common::{prover, FiatShamirRng, Int, PolyZ, PolyZp, Prover, RSAGroup};
+use dark::DARK;
+use rug::Assign;
 use std::num::NonZeroUsize;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -156,7 +157,6 @@ impl Sonic {
         });
         fiat.prover_send(&rx_1_commit);
 
-
         let y = fiat.verifier_rand_below(&sk.modulo);
 
         // t(X, y) = r(X, 1) x [r(X, y) + s(X, y)]
@@ -168,7 +168,6 @@ impl Sonic {
             (commit, (vec![(rx_1_z, r_rx_1), (tx_y_z, r_tx_y)]))
         });
         fiat.prover_send(&tx_y_commit);
-
 
         // coefficient query
         let ((tx_y_l_commit, tx_y_h_commit), prover) = prover!(prover, (mut witnesses) => {
@@ -372,7 +371,8 @@ fn get_sx_y(s: &SparseBiPolyZp, y: &Int, n: usize) -> PolyZp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use poly_commit::*;
+    use common::*;
+    use common::{assert, assert_eq};
     use rand::Rng;
 
     #[test]
@@ -507,7 +507,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_sonic_powmod() {
-        use poly_commit::{FiatShamirRng, UniformRandom};
+        use common::{FiatShamirRng, UniformRandom};
         let mut sonic = setup_sonic(5500);
         let mut rng = rand::thread_rng();
         // g^x = y mod p

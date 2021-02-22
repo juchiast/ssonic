@@ -1,5 +1,5 @@
 [package]
-name = "poly-commit"
+name = "dark"
 version = "0.1.0"
 authors = ["Duy Do <juchiast@gmail.com>"]
 edition = "2018"
@@ -7,6 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+common = { path = "../common" }
+
 rand = "0.7"
 rand_chacha = "0.2"
 digest = "0.9"
@@ -28,4 +30,4 @@ env_logger = "0.7"
 
 [features]
 defaults = []
-no-assert = []
+no-assert = ["common/no-assert"]
