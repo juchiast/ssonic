@@ -32,7 +32,7 @@ fn main() {
         .expect("need an argument");
 
     let mut dark = {
-        let key_path = format!("keys/{}_prover.json", n);
+        let key_path = format!("keys/{}.json", n);
         let start = Instant::now();
         match DARK::<RSAGroup>::from_key(&key_path, true) {
             Ok(dark) => {

@@ -4,7 +4,7 @@ extern crate log;
 mod dark;
 pub mod poe;
 
-pub use dark::{Instance, VerifiableKey, DARK};
+pub use crate::dark::{Instance, VerifiableKey, DARK};
 pub use poe::proof_of_exponentation;
 
 #[cfg(test)]

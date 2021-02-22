@@ -490,7 +490,7 @@ mod tests {
     }
 
     fn setup_sonic(max_deg: usize) -> Sonic {
-        let key_path = format!("keys/test_key_{}.json", max_deg);
+        let key_path = format!("../keys/{}.json", max_deg);
         let dark = {
             match DARK::<RSAGroup>::from_key(&key_path, true) {
                 Ok(dark) => dark,
@@ -508,7 +508,9 @@ mod tests {
     #[ignore]
     fn test_sonic_powmod() {
         use common::{FiatShamirRng, UniformRandom};
-        let mut sonic = setup_sonic(5500);
+
+        let size = 8;
+        let mut sonic = setup_sonic(1000);
         let mut rng = rand::thread_rng();
         // g^x = y mod p
         let p = sonic.dark.p.clone();
@@ -518,15 +520,15 @@ mod tests {
             let mut x = rng.gen::<u64>();
             let temp = x;
             let mut x_bits = Vec::new();
-            for _ in 0..64 {
+            for _ in 0..size {
                 x_bits.push(Int::from(x & 1));
                 x >>= 1;
             }
             x_bits.reverse();
-            (temp, x_bits)
+            (temp & ((1 << size) - 1), x_bits)
         };
 
-        let circuit = crate::modulo::exp(64);
+        let circuit = crate::modulo::exp(size);
         let input = std::iter::once(g.clone())
             .chain(x_bits.into_iter())
             .collect::<Vec<_>>();

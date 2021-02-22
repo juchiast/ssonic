@@ -21,4 +21,4 @@ env_logger = "0.7"
 
 [features]
 defaults = []
-no-assert = ["common/no-assert"]
+no-assert = ["common/no-assert", "dark/no-assert"]

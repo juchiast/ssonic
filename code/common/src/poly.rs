@@ -231,12 +231,12 @@ mod tests {
     use super::*;
     use crate::UniformRandom;
     use crate::{assert, assert_eq};
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use rug::ops::Pow;
 
     fn init_randomness() -> (ChaCha20Rng, UniformRandom) {
-        let mut seed = [8u8; 32];
+        let seed = [8u8; 32];
         let chacha = ChaCha20Rng::from_seed(seed);
         let uniform = UniformRandom::new();
         (chacha, uniform)

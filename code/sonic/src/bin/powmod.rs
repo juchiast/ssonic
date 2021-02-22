@@ -5,7 +5,7 @@ use std::time::Instant;
 use sonic::sonic::*;
 
 fn setup_sonic(max_deg: usize) -> Sonic {
-    let key_path = format!("keys/test_key_{}.json", max_deg);
+    let key_path = format!("keys/{}.json", max_deg);
     let dark = {
         match DARK::<RSAGroup>::from_key(&key_path, true) {
             Ok(dark) => dark,
