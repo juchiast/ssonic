@@ -2,8 +2,8 @@
 
 extern crate dark;
 
-use common::*;
 use common::traits::*;
+use common::*;
 use common::*;
 use rug::ops::Pow;
 use std::time::Instant;

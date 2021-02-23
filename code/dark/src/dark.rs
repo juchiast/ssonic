@@ -322,7 +322,7 @@ impl DARK<RSAGroup> {
 
             let deg_h = degree / 2;
 
-            let ((y_high, commit_high), prover) = prover!(prover, (p) => {
+            let ((y_high, commit_high), prover) = prover!(fiat, prover, (p) => {
                 trace!("degree = {}", degree);
                 check(p.degree() == degree, "invalid witness degree")?;
                 let y_high = p.multi_evaluate_modulo(&z, &self.p, deg_h);
@@ -336,12 +336,10 @@ impl DARK<RSAGroup> {
                 trace!("perf:commit: {:?}", Instant::now() - start);
                 ((y_high, commit_high), (p))
             });
-            fiat.prover_send(&y_high);
-            fiat.prover_send(&commit_high);
 
             let l = fiat.verifier_rand_prime();
 
-            let (qq, prover) = prover!(prover, (p) => {
+            let (qq, prover) = prover!(fiat, prover, (p) => {
                 trace!("PoE");
                 let start = Instant::now();
                 let (positive, negative) = p.split_negative(deg_h);
@@ -357,7 +355,6 @@ impl DARK<RSAGroup> {
                 trace!("perf:PoE: {:?}", Instant::now() - start);
                 (qq, (p))
             });
-            fiat.prover_send(&qq);
 
             let dd = Int::from(deg_h + 1);
             let r = Int::from(&self.q % &l).pow_mod(&dd, &l).unwrap();
@@ -382,7 +379,7 @@ impl DARK<RSAGroup> {
 
             bound *= &self.p_1_2;
 
-            let (_, prover) = prover!(prover, (mut p) => {
+            let (_, prover) = prover!(fiat, prover, (mut p) => {
                 p.shink(&alpha);
                 ((), (p))
             });
@@ -391,11 +388,10 @@ impl DARK<RSAGroup> {
         }
 
         let prover = outer_prover.unwrap();
-        let (f, prover) = prover!(prover, (mut p) => {
+        let (f, prover) = prover!(fiat, prover, (mut p) => {
             check(p.f.len() == 1, "invalid witness degree")?;
             (p.f.pop().unwrap(), ())
         });
-        fiat.prover_send(&f);
 
         for y in y {
             check((y - &f).is_divisible(&self.p), "y != f mod p")?;
@@ -447,7 +443,7 @@ impl DARK<RSAGroup> {
         assert_eq!(z.len(), y.len());
 
         let bound_coeff_k = bound.clone() * &self.bound_alpha * (Int::from(1) << LAMBDA);
-        let ((commit_k, y_k), prover) = prover!(prover, (p, r) => {
+        let ((commit_k, y_k), prover) = prover!(fiat, prover, (p, r) => {
             let mut k = Vec::new();
             k.resize_with(degree + 1, || {
                 let mut result = Int::from(0);
@@ -461,12 +457,10 @@ impl DARK<RSAGroup> {
             let y_k = k.multi_evaluate_modulo(&z, &self.p, deg);
             ((commit_k, y_k), (p, r, k, r_k))
         });
-        fiat.prover_send(&commit_k);
-        fiat.prover_send(&y_k);
 
         let c = fiat.verifier_rand_signed(&self.bound_alpha);
 
-        let (r_s, prover) = prover!(prover, (p, r, k, r_k) => {
+        let (r_s, prover) = prover!(fiat, prover, (p, r, k, r_k) => {
             assert_eq!(p.f.len(), k.f.len());
             let mut s = p;
             for (a, b) in s.f.iter_mut().zip(k.f.iter()) {
@@ -476,7 +470,6 @@ impl DARK<RSAGroup> {
             let r_s = r * &c + &r_k;
             (r_s, (s))
         });
-        fiat.prover_send(&r_s);
 
         let commit_s = self.group.mul(
             &self.group.mul(&self.group.power(&commit, &c), &commit_k),
@@ -516,7 +509,7 @@ impl DARK<RSAGroup> {
             assert_eq!(x.z.len(), k);
             assert_eq!(x.y.len(), k);
         }
-        let (_, prover) = prover!(prover, (witnesses) => {
+        let (_, prover) = prover!(fiat, prover, (witnesses) => {
             assert_eq!(witnesses.len(), instances.len());
             for i in 0..witnesses.len() {
                 let result = witnesses[i]
@@ -545,7 +538,7 @@ impl DARK<RSAGroup> {
 
             let l = fiat.verifier_rand_prime();
 
-            let (qq, prover) = prover!(prover, (mut witnesses) => {
+            let (qq, prover) = prover!(fiat, prover, (mut witnesses) => {
                 trace!("deg_diff = {}", deg_diff);
                 let (f, r) = witnesses.get_mut(i).unwrap();
 
@@ -568,7 +561,6 @@ impl DARK<RSAGroup> {
                 f.f.extend(std::iter::repeat(Int::from(0)).take(deg_diff));
                 (qq, witnesses)
             });
-            fiat.prover_send(&qq);
 
             let r = Int::from(&self.q)
                 .pow_mod(&Int::from(deg_diff), &l)
@@ -589,7 +581,7 @@ impl DARK<RSAGroup> {
 
         let mut result = instances.pop().unwrap();
         let prover = outer_prover.unwrap();
-        let (_, prover) = prover!(prover, (mut witnesses) => {
+        let (_, prover) = prover!(fiat, prover, (mut witnesses) => {
             let result = witnesses.pop().unwrap();
             ((), (witnesses, result))
         });
@@ -612,7 +604,7 @@ impl DARK<RSAGroup> {
             }
             assert!(result.z.iter().zip(instance.z.iter()).all(|(a, b)| a == b));
 
-            let (_, prover) = prover!(prover, (mut witnesses, result) => {
+            let (_, prover) = prover!(fiat, prover, (mut witnesses, result) => {
                 let (mut f, mut r) = result;
                 let (f_1, r_1) = witnesses.pop().unwrap();
 
@@ -631,7 +623,7 @@ impl DARK<RSAGroup> {
         }
         let prover = outer_prover.unwrap();
 
-        let (_, prover) = prover!(prover, (_, witness) => {
+        let (_, prover) = prover!(fiat, prover, (_, witness) => {
             assert!({
                 let evaluated = witness.0.multi_evaluate_modulo(&result.z, &self.p, witness.0.degree());
                 evaluated.into_iter().zip(result.y.iter()).all(|(a, b)| (a - b).is_divisible(&self.p))

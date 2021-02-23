@@ -2,9 +2,9 @@
 extern crate log;
 
 use common::*;
-use std::time::Instant;
-use sonic::sonic::*;
 use dark::DARK;
+use sonic::sonic::*;
+use std::time::Instant;
 
 fn setup_sonic(max_deg: usize) -> Sonic {
     trace!("Reading key");

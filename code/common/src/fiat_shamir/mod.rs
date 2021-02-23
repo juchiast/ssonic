@@ -193,16 +193,18 @@ pub enum Prover<T> {
     Proof(VecDeque<ProofElement>),
 }
 
-pub trait ExtractProof
+pub trait MessagesBatch
 where
     Self: Sized + std::fmt::Debug,
 {
     fn extract_prover_messages(
         proof: VecDeque<ProofElement>,
     ) -> Result<(Self, VecDeque<ProofElement>), String>;
+
+    fn prover_send_batch(&self, fiat: &mut FiatShamirRng);
 }
 
-impl<T> ExtractProof for T
+impl<T> MessagesBatch for T
 where
     T: ProverMessage,
 {
@@ -217,62 +219,82 @@ where
             None => Err("proof is empty".to_owned()),
         }
     }
+
+    fn prover_send_batch(&self, fiat: &mut FiatShamirRng) {
+        fiat.prover_send(self);
+    }
 }
 
 /// When prover doesn't send anything
-impl ExtractProof for () {
+impl MessagesBatch for () {
     fn extract_prover_messages(
         proof: VecDeque<ProofElement>,
     ) -> Result<(Self, VecDeque<ProofElement>), String> {
         Ok(((), proof))
     }
+
+    fn prover_send_batch(&self, _fiat: &mut FiatShamirRng) {}
 }
 
-impl<A, B> ExtractProof for (A, B)
+impl<A, B> MessagesBatch for (A, B)
 where
-    A: ExtractProof,
-    B: ExtractProof,
+    A: MessagesBatch,
+    B: MessagesBatch,
 {
     fn extract_prover_messages(
         proof: VecDeque<ProofElement>,
     ) -> Result<(Self, VecDeque<ProofElement>), String> {
-        let (a, proof) = <A as ExtractProof>::extract_prover_messages(proof)?;
-        let (b, proof) = <B as ExtractProof>::extract_prover_messages(proof)?;
+        let (a, proof) = <A as MessagesBatch>::extract_prover_messages(proof)?;
+        let (b, proof) = <B as MessagesBatch>::extract_prover_messages(proof)?;
         Ok(((a, b), proof))
+    }
+
+    fn prover_send_batch(&self, fiat: &mut FiatShamirRng) {
+        self.0.prover_send_batch(fiat);
+        self.1.prover_send_batch(fiat);
     }
 }
 
-impl<A, B, C, D> ExtractProof for (A, B, C, D)
+impl<A, B, C, D> MessagesBatch for (A, B, C, D)
 where
-    A: ExtractProof,
-    B: ExtractProof,
-    C: ExtractProof,
-    D: ExtractProof,
+    A: MessagesBatch,
+    B: MessagesBatch,
+    C: MessagesBatch,
+    D: MessagesBatch,
 {
     fn extract_prover_messages(
         proof: VecDeque<ProofElement>,
     ) -> Result<(Self, VecDeque<ProofElement>), String> {
-        let (a, proof) = <A as ExtractProof>::extract_prover_messages(proof)?;
-        let (b, proof) = <B as ExtractProof>::extract_prover_messages(proof)?;
-        let (c, proof) = <C as ExtractProof>::extract_prover_messages(proof)?;
-        let (d, proof) = <D as ExtractProof>::extract_prover_messages(proof)?;
+        let (a, proof) = <A as MessagesBatch>::extract_prover_messages(proof)?;
+        let (b, proof) = <B as MessagesBatch>::extract_prover_messages(proof)?;
+        let (c, proof) = <C as MessagesBatch>::extract_prover_messages(proof)?;
+        let (d, proof) = <D as MessagesBatch>::extract_prover_messages(proof)?;
         Ok(((a, b, c, d), proof))
+    }
+
+    fn prover_send_batch(&self, fiat: &mut FiatShamirRng) {
+        self.0.prover_send_batch(fiat);
+        self.1.prover_send_batch(fiat);
+        self.2.prover_send_batch(fiat);
+        self.3.prover_send_batch(fiat);
     }
 }
 
 #[macro_export]
 macro_rules! prover {
-    ($prover:ident, ( $( $name:pat),* ) => $code:block) => {{
+    ($fiat:expr, $prover:ident, ( $( $name:pat),* ) => $code:block) => {{
         #[allow(unused_parens)]
-        match $prover {
+        let (batch, prover) = match $prover {
             $crate::Prover::Witness(($($name),*)) => {
                 let (r, w) = $code;
                 (r, $crate::Prover::Witness(w))
             },
             $crate::Prover::Proof(p) => {
-                let (r, p) = $crate::fiat_shamir::ExtractProof::extract_prover_messages(p)?;
+                let (r, p) = $crate::fiat_shamir::MessagesBatch::extract_prover_messages(p)?;
                 (r, $crate::Prover::Proof(p))
             },
-        }
+        };
+        $crate::fiat_shamir::MessagesBatch::prover_send_batch(&batch, $fiat);
+        (batch, prover)
     }};
 }

@@ -1,8 +1,8 @@
 use common::*;
 use dark::DARK;
 use rand::Rng;
-use std::time::Instant;
 use sonic::sonic::*;
+use std::time::Instant;
 
 fn setup_sonic(max_deg: usize) -> Sonic {
     let key_path = format!("keys/{}.json", max_deg);

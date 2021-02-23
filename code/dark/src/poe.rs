@@ -14,11 +14,10 @@ pub fn proof_of_exponentation<G: Group, W>(
     let l = fiat.verifier_rand_prime();
     let (q, r) = x.clone().div_rem_euc(l.clone());
 
-    let (Q, prover) = prover!(prover, (w) => {
+    let (Q, prover) = prover!(fiat, prover, (w) => {
         let Q = group.power(u, &q);
         (Q, (w))
     });
-    fiat.prover_send(&Q);
 
     let Q_l = group.power(&Q, &l);
     let u_r = group.power(u, &r);

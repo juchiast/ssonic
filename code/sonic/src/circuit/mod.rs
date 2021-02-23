@@ -99,7 +99,9 @@ fn convert_single(
 
     use uint32::VertexType as Type;
     let result = match u.inner.as_ref() {
-        Type::Input(index) => (0..32).map(|i| Vertex::input(i + 32 * index, true)).collect(),
+        Type::Input(index) => (0..32)
+            .map(|i| Vertex::input(i + 32 * index, true))
+            .collect(),
         Type::Constant(x) => convert_constant(*x, consts),
         Type::And(a, b) => and_gate(
             &convert_single(a, consts, cache),

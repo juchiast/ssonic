@@ -148,29 +148,27 @@ impl Sonic {
         info!("n = {}", n);
         info!("S(X, Y) length: {}", sk.s.coeff.len());
         info!("k(Y) length: {}", sk.k.coeff.len());
-        let (rx_1_commit, prover) = prover!(prover, (rx_1) => {
+        let (rx_1_commit, prover) = prover!(fiat, prover, (rx_1) => {
             assert_eq!(&sk.modulo, &rx_1.p);
             assert_eq!(rx_1.degree(), 3 * n);
             trace!("Commit r(X, 1)");
             let (commitment, (rx_1_z, _, r_rx_1)) = self.dark.hiding_commit_zp(rx_1.clone())?;
             (commitment, (rx_1, rx_1_z, r_rx_1))
         });
-        fiat.prover_send(&rx_1_commit);
 
         let y = fiat.verifier_rand_below(&sk.modulo);
 
         // t(X, y) = r(X, 1) x [r(X, y) + s(X, y)]
-        let (tx_y_commit, prover) = prover!(prover, (rx_1, rx_1_z, r_rx_1) => {
+        let (tx_y_commit, prover) = prover!(fiat, prover, (rx_1, rx_1_z, r_rx_1) => {
             trace!("Commit t(X, y)");
             let tx_y = get_tx_y(&rx_1, sk, n, &y);
             assert_eq!(&tx_y.f[tx_y.degree() - 4 * n], &0);
             let (commit, (tx_y_z, _, r_tx_y)) = self.dark.hiding_commit_zp(tx_y.clone())?;
             (commit, (vec![(rx_1_z, r_rx_1), (tx_y_z, r_tx_y)]))
         });
-        fiat.prover_send(&tx_y_commit);
 
         // coefficient query
-        let ((tx_y_l_commit, tx_y_h_commit), prover) = prover!(prover, (mut witnesses) => {
+        let ((tx_y_l_commit, tx_y_h_commit), prover) = prover!(fiat, prover, (mut witnesses) => {
             trace!("Commit t_low/high");
 
             let at = 4 * n;
@@ -199,24 +197,18 @@ impl Sonic {
 
             ((tx_y_l_commit, tx_y_h_commit), witnesses)
         });
-        fiat.prover_send(&tx_y_l_commit);
-        fiat.prover_send(&tx_y_h_commit);
 
         let z = fiat.verifier_rand_below(&self.dark.p);
         let yz = y.clone() * &z;
         let query_points = vec![z.clone(), yz];
 
-        let ((y_r, y_t, y_low, y_high), prover) = prover!(prover, (witnesses) => {
+        let ((y_r, y_t, y_low, y_high), prover) = prover!(fiat, prover, (witnesses) => {
             let y = witnesses
                 .iter()
                 .map(|w| w.0.multi_evaluate_modulo(&query_points, &self.dark.p, w.0.degree()))
                 .collect::<Vec<_>>();
             ((y[0].clone(), y[1].clone(), y[2].clone(), y[3].clone()), witnesses)
         });
-        fiat.prover_send(&y_r);
-        fiat.prover_send(&y_t);
-        fiat.prover_send(&y_low);
-        fiat.prover_send(&y_high);
 
         // t(z, y)
         let t_zy = y_t[0].clone();
