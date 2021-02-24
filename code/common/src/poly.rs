@@ -15,7 +15,7 @@ impl PolyZp {
         assert_ne!(modulo.is_probably_prime(16), rug::integer::IsPrime::No);
         for c in &mut f.f {
             *c %= modulo;
-            if &*c < &0 {
+            if *c < 0 {
                 *c += modulo;
             }
         }
@@ -73,7 +73,7 @@ impl PolyZ {
         let mut f = poly.f;
         let bound = Int::from(&poly.p >> 1);
         for a in f.iter_mut() {
-            if &*a > &bound {
+            if *a > bound {
                 *a -= &poly.p;
             }
         }
@@ -124,13 +124,13 @@ impl PolyZ {
             .iter()
             .skip_while(|x| *x < &0)
             .cloned()
-            .map(|x| if &x < &0 { Int::from(0) } else { x })
+            .map(|x| if x < 0 { Int::from(0) } else { x })
             .collect::<Vec<_>>();
         let mut neg = self.f[..=degree]
             .iter()
             .skip_while(|x| *x > &0)
             .cloned()
-            .map(|x| if &x > &0 { Int::from(0) } else { -x })
+            .map(|x| if x > 0 { Int::from(0) } else { -x })
             .collect::<Vec<_>>();
         if pos.is_empty() {
             pos.push(Int::from(0));

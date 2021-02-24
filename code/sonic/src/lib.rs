@@ -1,3 +1,5 @@
+#![allow(clippy::many_single_char_names, clippy::let_and_return)]
+
 #[macro_use]
 extern crate log;
 

@@ -22,6 +22,12 @@ impl ABC {
     }
 }
 
+impl Default for ABC {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // for testing
 pub fn to_rx_y(abc: &[ABC], modulo: &Int, n: usize) -> SparseBiPolyZp {
     let n = n as i32;
@@ -81,7 +87,7 @@ pub fn to_sk(uvwk: &[UVWK], n: usize, modulo: &Int) -> SK {
             let (value, i) = (value.clone(), i.get() as i32);
             s.push((value, i + n, q + n));
         }
-        if &uvwk.k != &0 {
+        if uvwk.k != 0 {
             k.push((uvwk.k.clone(), q + n));
         }
     }
@@ -163,7 +169,7 @@ impl Sonic {
             trace!("Commit t(X, y)");
             let tx_y = get_tx_y(&rx_1, sk, n, &y);
             assert_eq!(&tx_y.f[tx_y.degree() - 4 * n], &0);
-            let (commit, (tx_y_z, _, r_tx_y)) = self.dark.hiding_commit_zp(tx_y.clone())?;
+            let (commit, (tx_y_z, _, r_tx_y)) = self.dark.hiding_commit_zp(tx_y)?;
             (commit, (vec![(rx_1_z, r_rx_1), (tx_y_z, r_tx_y)]))
         });
 
@@ -189,8 +195,8 @@ impl Sonic {
                 &sk.modulo,
             );
 
-            let (tx_y_l_commit, (tx_y_l, _, r_l)) = self.dark.hiding_commit_zp(tx_y_l.clone())?;
-            let (tx_y_h_commit, (tx_y_h, _, r_h)) = self.dark.hiding_commit_zp(tx_y_h.clone())?;
+            let (tx_y_l_commit, (tx_y_l, _, r_l)) = self.dark.hiding_commit_zp(tx_y_l)?;
+            let (tx_y_h_commit, (tx_y_h, _, r_h)) = self.dark.hiding_commit_zp(tx_y_h)?;
 
             witnesses.push((tx_y_l, r_l));
             witnesses.push((tx_y_h, r_h));
@@ -222,13 +228,13 @@ impl Sonic {
         let k_y = sk.k.evaluate(&y);
         let p = &self.dark.p;
         let rhs = r_z1
-            * (r_zy * y.clone().pow_mod(&Int::from(-2 * (n as i32)), p).unwrap()
+            * (r_zy * y.pow_mod(&Int::from(-2 * (n as i32)), p).unwrap()
                 + s_zy * z.clone().pow_mod(&Int::from(2 * n), p).unwrap())
             - k_y * z.clone().pow_mod(&Int::from(4 * n), p).unwrap();
         check((t_zy.clone() - rhs).is_divisible(p), "t(X, Y) check failed")?;
 
-        let lhs = y_low[0].clone()
-            + y_high[0].clone() * z.clone().pow_mod(&Int::from(4 * n + 1), p).unwrap();
+        let lhs =
+            y_low[0].clone() + y_high[0].clone() * z.pow_mod(&Int::from(4 * n + 1), p).unwrap();
         check(
             (lhs - t_zy).is_divisible(p),
             "t(X, Y) coefficient check failed",
@@ -240,29 +246,29 @@ impl Sonic {
                 commitment: rx_1_commit,
                 degree: sk.n * 3,
                 bound: bound.clone(),
-                y: y_r.clone(),
+                y: y_r,
                 z: query_points.clone(),
             },
             dark::Instance {
                 commitment: tx_y_commit,
                 degree: sk.n * 7,
                 bound: bound.clone(),
-                y: y_t.clone(),
+                y: y_t,
                 z: query_points.clone(),
             },
             dark::Instance {
                 commitment: tx_y_l_commit,
                 degree: sk.n * 4 - 1,
                 bound: bound.clone(),
-                y: y_low.clone(),
+                y: y_low,
                 z: query_points.clone(),
             },
             dark::Instance {
                 commitment: tx_y_h_commit,
                 degree: 3 * sk.n - 1,
-                bound: bound.clone(),
-                y: y_high.clone(),
-                z: query_points.clone(),
+                bound,
+                y: y_high,
+                z: query_points,
             },
         ];
         let (prover, instance) = self.dark.combine(prover, instances, fiat)?;
@@ -392,7 +398,7 @@ mod tests {
         let output = crate::circuit::evaluate(&circuit, &input, &p);
 
         assert_eq!(&output[1], &g);
-        assert!((g.clone().pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p));
+        assert!((g.pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p));
 
         let linear_circuit = crate::linear_circuit::convert(circuit);
         let left_input = input;
@@ -475,9 +481,9 @@ mod tests {
         let r_zy = rx_1.evaluate(&(z.clone() * &y));
 
         let rhs = r_z1
-            * (r_zy * y.clone().pow_mod(&Int::from(-2 * (n as i32)), &p).unwrap()
+            * (r_zy * y.pow_mod(&Int::from(-2 * (n as i32)), &p).unwrap()
                 + s_zy * z.clone().pow_mod(&Int::from(2 * n), &p).unwrap())
-            - k_y * z.clone().pow_mod(&Int::from(4 * n), &p).unwrap();
+            - k_y * z.pow_mod(&Int::from(4 * n), &p).unwrap();
         assert!((t_zy - rhs).is_divisible(&p));
     }
 
@@ -527,7 +533,7 @@ mod tests {
         let output = crate::circuit::evaluate(&circuit, &input, &p);
 
         assert_eq!(&output[1], &g);
-        assert!((g.clone().pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p));
+        assert!((g.pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p));
 
         let linear_circuit = crate::linear_circuit::convert(circuit);
         let left_input = input;

@@ -41,8 +41,7 @@ fn main() {
         .init();
 
     let bit_size: usize = std::env::args()
-        .skip(1)
-        .next()
+        .nth(1)
         .map(|x| x.parse().unwrap())
         .expect("need an argument");
 
@@ -64,7 +63,7 @@ fn main() {
     };
 
     let circuit = sonic::modulo::exp(bit_size);
-    let input = std::iter::once(g.clone())
+    let input = std::iter::once(g)
         .chain(x_bits.into_iter())
         .collect::<Vec<_>>();
     let output = sonic::circuit::evaluate(&circuit, &input, &p);

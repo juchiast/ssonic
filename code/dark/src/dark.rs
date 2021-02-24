@@ -61,7 +61,7 @@ fn proof_of_precomputation(
     key: &VerifiableKey<RSAGroup>,
     fiat: &mut FiatShamirRng,
 ) -> Result<(), String> {
-    if &key.g_powers[0] != &key.g {
+    if key.g_powers[0] != key.g {
         return Err("g[0]".to_owned());
     }
     for i in 1..key.g_powers.len() {
@@ -227,7 +227,7 @@ impl DARK<RSAGroup> {
 
     /// Commit a polynomial in Z_p[X].
     pub fn commit_zp(&mut self, polynomial: PolyZp) -> Result<Int, String> {
-        check(&polynomial.p == &self.p, "polynomial has different modulo")?;
+        check(polynomial.p == self.p, "polynomial has different modulo")?;
 
         let deg = polynomial.f.len() - 1;
         self.commit_z(PolyZ::new_bounded(polynomial), deg)
@@ -399,9 +399,9 @@ impl DARK<RSAGroup> {
 
         let mut lhs = self.p.clone().pow(log2_d.ceil() as u32);
         lhs *= &bound;
-        check(&lhs < &self.q, "sigma")?;
+        check(lhs < self.q, "sigma")?;
 
-        check(&f.clone().abs() <= &bound, "bound")?;
+        check(f.clone().abs() <= bound, "bound")?;
 
         crate::proof_of_exponentation(prover, &self.group, &self.g, &commit, &f, fiat)
     }
@@ -480,7 +480,7 @@ impl DARK<RSAGroup> {
         let y_s = (0..z.len())
             .map(|i| (y[i].clone() * &c + &y_k[i]) % &self.p)
             .collect();
-        let bound_s = bound.clone() * &self.bound_alpha + &bound_coeff_k;
+        let bound_s = bound * &self.bound_alpha + &bound_coeff_k;
 
         self.multi_eval_z(
             prover,
@@ -504,21 +504,28 @@ impl DARK<RSAGroup> {
     ) -> Result<(Prover<(PolyZ, Int)>, Instance), String> {
         assert!(!instances.is_empty());
         assert!(instances.len() <= MAX_JOINED_POLY as usize);
-        let k = instances[0].z.len();
-        for x in &instances {
-            assert_eq!(x.z.len(), k);
-            assert_eq!(x.y.len(), k);
+        #[cfg(any(not(feature = "no-assert"), test))]
+        {
+            let k = instances[0].z.len();
+            for x in &instances {
+                assert_eq!(x.z.len(), k);
+                assert_eq!(x.y.len(), k);
+            }
         }
+
         let (_, prover) = prover!(fiat, prover, (witnesses) => {
             assert_eq!(witnesses.len(), instances.len());
-            for i in 0..witnesses.len() {
-                let result = witnesses[i]
-                    .0
-                    .multi_evaluate_modulo(&instances[i].z, &self.p, witnesses[i].0.degree());
-                assert!(result
-                    .into_iter()
-                    .zip(instances[i].y.iter())
-                    .all(|(a, b)| (a - b).is_divisible(&self.p)));
+            #[cfg(any(not(feature = "no-assert"), test))]
+            {
+                for i in 0..witnesses.len() {
+                    let result = witnesses[i]
+                        .0
+                        .multi_evaluate_modulo(&instances[i].z, &self.p, witnesses[i].0.degree());
+                    assert!(result
+                        .into_iter()
+                        .zip(instances[i].y.iter())
+                        .all(|(a, b)| (a - b).is_divisible(&self.p)));
+                }
             }
             ((), witnesses)
         });
@@ -630,7 +637,7 @@ impl DARK<RSAGroup> {
             });
             ((), witness)
         });
-        assert!(&result.bound > &0);
+        assert!(result.bound > 0);
         Ok((prover, result))
     }
 }

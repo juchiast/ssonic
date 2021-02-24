@@ -62,7 +62,7 @@ impl PierreGenPrime {
             l,
             m_1: m.clone() - 1,
             m,
-            carmichael_lambda_m: Int::from(carmichael_lambda_m),
+            carmichael_lambda_m,
             uniform: UniformRandom::new(),
             bound_alpha,
             euler_totient_m,
@@ -81,7 +81,7 @@ impl PierreGenPrime {
                     .clone()
                     .pow_mod(&self.carmichael_lambda_m, &self.m)
                     .unwrap();
-                if &u == &0 {
+                if u == 0 {
                     break;
                 }
                 self.uniform.rand_below(&self.m_1, rng, &mut r);
@@ -92,8 +92,8 @@ impl PierreGenPrime {
             }
             b
         };
-        assert!(&b < &self.m);
-        assert!(&1 == &self.m.clone().gcd(&b)); // TODO: Cloning
+        assert!(b < self.m);
+        assert!(1 == self.m.clone().gcd(&b));
         loop {
             let mut alpha = Int::from(0);
             self.uniform.rand_below(&self.bound_alpha, rng, &mut alpha);

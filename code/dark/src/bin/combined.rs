@@ -1,3 +1,5 @@
+#![allow(clippy::needless_collect, clippy::many_single_char_names)]
+
 extern crate dark;
 
 use common::*;
@@ -26,8 +28,7 @@ fn main() {
         .init();
 
     let n: usize = std::env::args()
-        .skip(1)
-        .next()
+        .nth(1)
         .map(|x| x.parse().unwrap())
         .expect("need an argument");
 

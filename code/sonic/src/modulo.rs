@@ -24,7 +24,7 @@ pub fn exp(bit_size: usize) -> Vec<Vertex> {
 }
 
 pub fn select(x: Vertex, y: Vertex, b: Vertex, one: Vertex) -> Vertex {
-    (one - b.clone()) * x + b.clone() * y
+    (one - b.clone()) * x + b * y
 }
 
 #[cfg(test)]
@@ -57,6 +57,6 @@ mod tests {
             .collect::<Vec<_>>();
         let output = crate::circuit::evaluate(&circuit, &input, &p);
         assert_eq!(&output[1], &g);
-        assert!((g.clone().pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p));
+        assert!((g.pow_mod(&Int::from(x), &p).unwrap() - &output[0]).is_divisible(&p));
     }
 }

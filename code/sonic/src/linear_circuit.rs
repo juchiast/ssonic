@@ -41,7 +41,7 @@ impl Circuit {
             .sum()
     }
 
-    fn iter_vertices<'a>(&'a self) -> impl Iterator<Item = (Vertex, &'a VertexType)> {
+    fn iter_vertices(&self) -> impl Iterator<Item = (Vertex, &'_ VertexType)> {
         self.vertices
             .iter()
             .enumerate()
@@ -136,7 +136,7 @@ impl Circuit {
                     let o = get_out(&i);
                     let abc = result.get_mut(o).unwrap();
                     abc.c = (value_a.clone() - &value_b) % modulo;
-                    if &abc.c < &0 {
+                    if abc.c < 0 {
                         abc.c += modulo;
                     }
                     abc.a.assign(1);
@@ -146,15 +146,18 @@ impl Circuit {
             }
         }
 
-        for i in self.output.iter() {
-            assert_eq!(&result[get_out(i)].c, &0);
-        }
+        #[cfg(any(not(feature = "no-assert"), test))]
+        {
+            for i in self.output.iter() {
+                assert_eq!(&result[get_out(i)].c, &0);
+            }
 
-        for abc in result.iter() {
-            assert!((abc.a.clone() * &abc.b - &abc.c).is_divisible(modulo));
-            assert!(&0 <= &abc.a && &abc.a < modulo);
-            assert!(&0 <= &abc.b && &abc.b < modulo);
-            assert!(&0 <= &abc.c && &abc.c < modulo);
+            for abc in result.iter() {
+                assert!((abc.a.clone() * &abc.b - &abc.c).is_divisible(modulo));
+                assert!(0 <= abc.a && &abc.a < modulo);
+                assert!(0 <= abc.b && &abc.b < modulo);
+                assert!(0 <= abc.c && &abc.c < modulo);
+            }
         }
 
         assert!(assigned.into_iter().all(|b| b));
@@ -277,6 +280,7 @@ pub fn convert(vertices: Vec<crate::circuit::Vertex>) -> Circuit {
 
     let mut left_input: BTreeMap<usize, Vertex> = BTreeMap::new();
 
+    #[cfg(any(not(feature = "no-assert"), test))]
     let vertices_count = all_vertices.len();
     let mut bools = Vec::new();
     let mut vertices = all_vertices
@@ -308,6 +312,7 @@ pub fn convert(vertices: Vec<crate::circuit::Vertex>) -> Circuit {
 
     let mut right_input = Vec::new();
     let mut output = Vec::new();
+    #[cfg(any(not(feature = "no-assert"), test))]
     let output_count = output_vertices.len();
     for v in output_vertices {
         vertices.push(VertexType::Input);

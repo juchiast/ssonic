@@ -4,7 +4,7 @@ pub fn is_prime(n: u32) -> bool {
 
 fn pow(mut a: u64, mut n: u64, m: u64) -> u64 {
     let mut result = 1;
-    a = a % m;
+    a %= m;
     while n > 0 {
         if n & 1 == 1 {
             result = result * a % m;
@@ -12,7 +12,7 @@ fn pow(mut a: u64, mut n: u64, m: u64) -> u64 {
         n >>= 1;
         a = a * a % m;
     }
-    return result;
+    result
 }
 
 fn witness_test(s: u32, d: u64, n: u64, witness: u64) -> bool {
@@ -29,7 +29,7 @@ fn witness_test(s: u32, d: u64, n: u64, witness: u64) -> bool {
         }
         p = p * p % n;
     }
-    return false;
+    false
 }
 
 fn miller(n: u64) -> bool {

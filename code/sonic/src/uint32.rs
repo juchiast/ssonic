@@ -131,7 +131,8 @@ impl std::ops::BitAnd<Vertex> for Vertex {
     }
 }
 
-pub fn sha256_what(input: &[u32]) -> Vec<u32> {
+/*
+pub fn sha256_int(input: &[u32]) -> Vec<u32> {
     let k: Vec<u32> = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
         0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -212,6 +213,7 @@ pub fn sha256_what(input: &[u32]) -> Vec<u32> {
 
     r
 }
+*/
 
 pub fn sha256() -> Vec<Vertex> {
     let k = [
@@ -238,14 +240,12 @@ pub fn sha256() -> Vec<Vertex> {
     .map(|x| Vertex::constant(*x))
     .collect::<Vec<_>>();
 
-    let input = (0..16).map(|i| Vertex::input(i)).collect::<Vec<_>>();
+    let input = (0..16).map(Vertex::input).collect::<Vec<_>>();
 
     let mut w: Vec<Vertex> = Vec::new();
-    w.resize_with(64, || Vertex::zero());
+    w.resize_with(64, Vertex::zero);
 
-    for i in 0..16 {
-        w[i] = input[i].clone();
-    }
+    w[..16].clone_from_slice(&input[..16]);
 
     for i in 16..64 {
         let s0 = w[i - 15].right_rotate(7) ^ w[i - 15].right_rotate(18) ^ (w[i - 15].clone() >> 3);

@@ -5,6 +5,12 @@ pub struct UniformRandom {
     bytes: Vec<u8>,
 }
 
+impl Default for UniformRandom {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UniformRandom {
     pub fn new() -> Self {
         Self { bytes: Vec::new() }

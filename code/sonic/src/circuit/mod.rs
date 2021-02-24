@@ -76,7 +76,7 @@ impl Vertex {
 pub fn convert(a: Vec<uint32::Vertex>) -> Vec<Vertex> {
     // [0, 1, 2, 2^-1]
     let consts: Vec<Vertex> = (0..=2)
-        .map(|x| Vertex::constant(x))
+        .map(Vertex::constant)
         .chain(std::iter::once(Vertex {
             inner: Rc::new(VertexType::ConstantInverse(Int::from(2))),
         }))
@@ -218,7 +218,7 @@ fn evaluate_single(
     let result = match v.inner.as_ref() {
         VertexType::Input(i, is_bool) => {
             let r = input[*i].clone();
-            assert!(!is_bool || &r == &0 || &r == &1);
+            assert!(!is_bool || r == 0 || r == 1);
             r
         }
         VertexType::Constant(u) => u.clone(),
