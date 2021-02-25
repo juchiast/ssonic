@@ -61,10 +61,6 @@ impl Group for RSAGroup {
     fn equal(&self, a: &Self::Element, b: &Self::Element) -> bool {
         assert!(self.is_element(a));
         assert!(self.is_element(b));
-        let mut a = a.clone();
-        let mut b = b.clone();
-        a %= &self.modulo;
-        b %= &self.modulo;
         a == b
     }
 
